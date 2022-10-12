@@ -1,5 +1,13 @@
 FROM nvidia/cuda:11.6.2-cudnn8-runtime-ubuntu20.04
 
+
+ENV DEBIAN_FRONTEND=noninteractive 
+RUN apt-get update && apt-get install -y software-properties-common
+RUN add-apt-repository ppa:deadsnakes/ppa -y && \ 
+    apt-get install -y python3.8 && \
+    apt-get install -y python3-venv python3-pip
+RUN ln -s /usr/bin/python3 /usr/bin/python
+
 COPY . /onnx-olive
 WORKDIR /onnx-olive
 
@@ -8,4 +16,7 @@ RUN pip install onnxruntime-gpu==1.12.1
 RUN pip install mlperf_loadgen --extra-index-url https://olivewheels.azureedge.net/test
 RUN pip install -e .
 
-CMD ["bash"]
+ENTRYPOINT [ "python", "-m", "olive" ]
+
+# For e.g. A benchmarking job can be run via the following command
+# docker run -it --rm --gpus all -v /home/giqbal/Source/onnx-octomizer/models:/models octoml/olive:cuda optimize --model_path /models/yolov5s.onnx --result_path /models/yolov5s --providers cpu,cuda,tensorrt --ort_opt_level_list disable,all --run_all
