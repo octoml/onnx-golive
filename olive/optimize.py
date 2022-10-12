@@ -194,17 +194,17 @@ def export_csv(csv_path, pretuning_result, tuning_results):
             "graph_opt",
             "intra_op_threads",
             "inter_op_threads",
-            "avg_ms",
             "p99_ms",
+            "avg_ms",
         ]
         csv_writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
         csv_writer.writeheader()
 
         pretuning_row = {key: None for key in fieldnames}
-        pretuning_row["avg_ms"] = "{:.3f}".format(
-            pretuning_result["latency_ms"]["avg"])
         pretuning_row["p99_ms"] = "{:.3f}".format(
             pretuning_result["latency_ms"]["latency_p99"])
+        pretuning_row["avg_ms"] = "{:.3f}".format(
+            pretuning_result["latency_ms"]["avg"])            
         csv_writer.writerow(pretuning_row)
 
         for result in tuning_results:
@@ -219,7 +219,7 @@ def export_csv(csv_path, pretuning_result, tuning_results):
                 "intra_op_num_threads"]
             result_row["inter_op_threads"] = result["session_options"][
                 "inter_op_num_threads"]
-            result_row["avg_ms"] = "{:.3f}".format(result["latency_ms"]["avg"])
             result_row["p99_ms"] = "{:.3f}".format(
                 result["latency_ms"]["latency_p99"])
+            result_row["avg_ms"] = "{:.3f}".format(result["latency_ms"]["avg"])                
             csv_writer.writerow(result_row)
