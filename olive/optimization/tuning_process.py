@@ -275,7 +275,9 @@ def get_latency(optimization_config, test_params, test_result=None, background_p
         onnx_session.run(onnx_output_names, optimization_config.inference_input_dict)
 
     # run test
-    if (session_name == "pretuning") or validate_latency(onnx_session, onnx_output_names, optimization_config.inference_input_dict, optimization_config.pretuning_latency_ms):
+    if ((session_name == "pretuning") or 
+        (optimization_config.run_all or 
+         validate_latency(onnx_session, onnx_output_names, optimization_config.inference_input_dict, optimization_config.pretuning_latency_ms))):
         latencies = []
         for i in range(optimization_config.test_num):
             t = time.perf_counter()

@@ -48,7 +48,8 @@ class OptimizationConfig:
                  dynamic_batching_size=1,
                  min_duration_sec=10,
                  cpu_cores=None,
-                 model_analyzer_config=None):
+                 model_analyzer_config=None,
+                 run_all=False):
 
         self.model_path = model_path
         self.inputs_spec = inputs_spec
@@ -77,6 +78,7 @@ class OptimizationConfig:
         self.dynamic_batching_size = dynamic_batching_size
         self.threads_num = threads_num
         self.min_duration_sec = min_duration_sec
+        self.run_all = run_all
         if omp_wait_policy_list:
             self.omp_wait_policy_list = omp_wait_policy_list
             if "ACTIVE" in [i.upper() for i in self.omp_wait_policy_list] and self.concurrency_num > 1:

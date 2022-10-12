@@ -61,7 +61,8 @@ def get_opt_config(args):
             dynamic_batching_size=config_dict.get("dynamic_batching_size"),
             threads_num=config_dict.get("threads_num"),
             min_duration_sec=config_dict.get("min_duration_sec"),
-            model_analyzer_config=config_dict.get("model_analyzer_config")
+            model_analyzer_config=config_dict.get("model_analyzer_config"),
+            run_all=config_dict.get("run_all")
         )
 
     else:
@@ -115,7 +116,8 @@ def get_opt_config(args):
             dynamic_batching_size=args.dynamic_batching_size if args.dynamic_batching_size else 1,
             threads_num=args.threads_num if args.threads_num else 1,
             min_duration_sec=args.min_duration_sec if args.min_duration_sec else 10,
-            model_analyzer_config=args.model_analyzer_config
+            model_analyzer_config=args.model_analyzer_config,
+            run_all=args.run_all
         )
 
     return opt_config
@@ -391,6 +393,7 @@ def main():
     parser_opt.add_argument("--threads_num", type=int, help="threads num for throughput optimization")
     parser_opt.add_argument("--min_duration_sec", type=int, help="minimum duration for each run in second")
     parser_opt.add_argument("--model_analyzer_config", help="model analyzer configuration file path")
+    parser_opt.add_argument("--run_all", help="runs all tests and skip the early out from runs which are 10x slower than pretuning result", action="store_true")
 
     # arguments for environment setup
     parser_opt.add_argument("--use_conda", help="run optimization in new conda env or not", action="store_true")
