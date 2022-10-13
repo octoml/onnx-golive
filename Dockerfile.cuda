@@ -1,6 +1,5 @@
 FROM nvidia/cuda:11.6.2-cudnn8-runtime-ubuntu20.04
 
-
 ENV DEBIAN_FRONTEND=noninteractive 
 RUN apt-get update && apt-get install -y software-properties-common
 RUN add-apt-repository ppa:deadsnakes/ppa -y && \ 
