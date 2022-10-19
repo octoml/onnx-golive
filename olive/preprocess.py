@@ -11,6 +11,7 @@ from onnxmltools.utils import load_model, save_model
 from onnxruntime.tools import onnx_model_utils
 
 import torch
+import pandas as pd
 
 from olive.optimization_config import OptimizationConfig
 from olive.optimize import optimize
@@ -71,6 +72,32 @@ def get_configurations(input_name, input_index, batch_sizes):
     for func_list, name_list in zip(all_funcs, all_names):
         yield (func_list, name_list)
 
+def write_csv_summary(result_dir):
+    all_dfs = []
+
+    for sub_dir in os.listdir(result_dir):
+        result_path = os.path.join(result_dir, sub_dir, 'olive_result.csv')
+        if not os.path.exists(result_path):
+            print("Skipping non-existing result from: " + result_path)
+            continue
+
+        print("Reading results from: " + result_path)
+        with open(result_path) as fh:
+            df = pd.read_csv(fh)
+            num_columns = len(df.columns)
+            for idx, dimension in enumerate(sub_dir.split('|')):
+                print("  Adding column " + dimension)
+                
+                dim_name, dim_value = dimension.split('=')
+                df.insert(num_columns + idx, dim_name, dim_value)
+                all_dfs.append(df)
+
+    combined_csv = pd.concat(all_dfs)
+    out_file = os.path.join(result_dir, 'merged.csv')
+
+    print("Writing results to: " + out_file)
+    combined_csv.to_csv(os.path.join(out_file, index=True, encoding='utf-8'))
+
 def main(model_path, result_dir, input_name, batch_index, batch_sizes):
     providers_list = ['cpu','cuda','tensorrt'] if torch.cuda.is_available() else ['cpu', 'openvino']
 
@@ -98,8 +125,10 @@ def main(model_path, result_dir, input_name, batch_index, batch_sizes):
         )
         optimize(opt_config)
 
+    write_csv_summary(result_dir)
+
 if __name__ == '__main__':
     model_path = sys.argv[1]
     out_dir = model_path + ".OUT"
-    main(model_path, out_dir, "input", 0, [1, 4, 8, 16])
+    main(model_path, out_dir, "input", 0, [1, 4])
 
