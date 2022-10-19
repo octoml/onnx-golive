@@ -1,4 +1,5 @@
 import itertools
+import logging
 import os
 import pathlib
 import sys
@@ -8,6 +9,7 @@ import onnx
 from onnxmltools.utils.float16_converter import convert_float_to_float16
 from onnxmltools.utils import load_model, save_model
 
+import onnxruntime as ort
 from onnxruntime.tools import onnx_model_utils
 
 import torch
@@ -15,6 +17,9 @@ import pandas as pd
 
 from olive.optimization_config import OptimizationConfig
 from olive.optimize import optimize
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 def get_input_shape(model, input_name: str):
     # iterate through inputs of the graph
@@ -78,15 +83,14 @@ def write_csv_summary(result_dir):
     for sub_dir in os.listdir(result_dir):
         result_path = os.path.join(result_dir, sub_dir, 'olive_result.csv')
         if not os.path.exists(result_path):
-            print("Skipping non-existing result from: " + result_path)
+            logger.info("Skipping non-existing result from: " + result_path)
             continue
 
-        print("Reading results from: " + result_path)
+        logger.info("Reading results from: " + result_path)
         with open(result_path) as fh:
             df = pd.read_csv(fh)
             num_columns = len(df.columns)
             for idx, dimension in enumerate(sub_dir.split('|')):
-                print("  Adding column " + dimension)
                 
                 dim_name, dim_value = dimension.split('=')
                 df.insert(num_columns + idx, dim_name, dim_value)
@@ -95,15 +99,18 @@ def write_csv_summary(result_dir):
     combined_csv = pd.concat(all_dfs)
     out_file = os.path.join(result_dir, 'merged.csv')
 
-    print("Writing results to: " + out_file)
-    combined_csv.to_csv(os.path.join(out_file, index=True, encoding='utf-8'))
+    logger.info("Writing results to: " + out_file)
+    combined_csv.to_csv(out_file, index=True, encoding='utf-8')
 
 def main(model_path, result_dir, input_name, batch_index, batch_sizes):
-    providers_list = ['cpu','cuda','tensorrt'] if torch.cuda.is_available() else ['cpu', 'openvino']
+    if "CUDAExecutionProvider" in ort.get_available_providers():
+        providers_list = ['cpu', 'cuda', 'tensorrt']
+    else:
+        providers_list = ['cpu', 'openvino']
 
     for func_list, name_list in get_configurations(input_name, batch_index, batch_sizes):
         config_name = '|'.join(name_list)
-        print("Running configuration: " + config_name)
+        logger.info("Running configuration: " + config_name)
 
         out_dir = os.path.join(result_dir, config_name)        
         pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
@@ -111,7 +118,6 @@ def main(model_path, result_dir, input_name, batch_index, batch_sizes):
         onnx_model = load_model(model_path)
         
         for name, func in zip(name_list, func_list):
-            print('  Applying function ' + name)
             onnx_model = func(onnx_model)
 
         converted_model_path = os.path.join(out_dir, 'converted_model.onnx')
