@@ -1,4 +1,5 @@
 import itertools
+import json
 import logging
 import os
 import pathlib
@@ -12,7 +13,6 @@ from onnxmltools.utils import load_model, save_model
 import onnxruntime as ort
 from onnxruntime.tools import onnx_model_utils
 
-import torch
 import pandas as pd
 
 from olive.optimization_config import OptimizationConfig
@@ -62,11 +62,24 @@ def batch_size_transform(input_name: str, input_index: int, batch_size: int):
 
     return _transform
 
-def get_configurations(input_name, input_index, batch_sizes):
-    dims = [
-        [('FP16=DISABLED', noop_transform), ('FP16=ENABLED', fp16_transform)],
-        [(f"BATCH_SIZE={x}", batch_size_transform(input_name, input_index, x)) for x in  batch_sizes],
-    ]
+def get_configurations(model_config_dict):
+    # A list of "dimensions", each containing a list of tuples of the form:
+    # ("feature_name=feature_value", Callable)
+    dims = []
+    if 'batch_input_name' in model_config_dict:
+        batch_input_name = model_config_dict['batch_input_name']
+        batch_input_index = model_config_dict['batch_input_index']
+        batch_sizes = model_config_dict['batch_sizes']
+
+        logger.info(f"Testing {batch_input_name}:{batch_input_index} over batch sizes: {batch_sizes}")
+        dims.append(
+            [(f"BATCH_SIZE={x}",
+              batch_size_transform(batch_input_name, batch_input_index, x)) for x in  batch_sizes])
+
+    if 'test_fp16' in model_config_dict:
+        logger.info("Enabling fp16 testing")
+        dims.append(
+            [('FP16=DISABLED', noop_transform), ('FP16=ENABLED', fp16_transform)])
 
     names = [[x[0] for x in dim] for dim in dims]
     funcs = [[x[1] for x in dim] for dim in dims]
@@ -102,13 +115,17 @@ def write_csv_summary(result_dir):
     logger.info("Writing results to: " + out_file)
     combined_csv.to_csv(out_file, index=True, encoding='utf-8')
 
-def main(model_path, result_dir, input_name, batch_index, batch_sizes):
-    if "CUDAExecutionProvider" in ort.get_available_providers():
-        providers_list = ['cpu', 'cuda', 'tensorrt']
-    else:
-        providers_list = ['cpu', 'openvino']
+def load_optimization_config(model_path, olive_config_dict):
+    opt_config = OptimizationConfig(
+        model_path=model_path,
+        **olive_config_dict
+    )
+    return opt_config
 
-    for func_list, name_list in get_configurations(input_name, batch_index, batch_sizes):
+def main(model_path, result_dir, model_config_dict, olive_config_dict):
+
+    for func_list, name_list in get_configurations(model_config_dict):
+
         config_name = '|'.join(name_list)
         logger.info("Running configuration: " + config_name)
 
@@ -123,18 +140,26 @@ def main(model_path, result_dir, input_name, batch_index, batch_sizes):
         converted_model_path = os.path.join(out_dir, 'converted_model.onnx')
         save_model(onnx_model, converted_model_path)
 
-        opt_config = OptimizationConfig(
-            model_path=converted_model_path,
-            providers_list=providers_list,
-            run_all=True,
-            result_path=out_dir,
-        )
+        olive_config_dict['result_path'] = out_dir
+        opt_config = load_optimization_config(converted_model_path, olive_config_dict)
         optimize(opt_config)
 
+    logging.info("Run complete; writing summarized results")
     write_csv_summary(result_dir)
 
 if __name__ == '__main__':
+    if len(sys.argv) < 4:
+        print("Usage: preprocess.py model_path model_config.json olive_config.json")
+        sys.exit(1)
+
     model_path = sys.argv[1]
     out_dir = model_path + ".OUT"
-    main(model_path, out_dir, "input", 0, [1, 4])
+    model_config_path = sys.argv[2]
+    olive_config_path = sys.argv[3]
+
+    with open(model_config_path) as fh1, open(olive_config_path) as fh2:
+        model_config_dict = json.load(fh1)
+        olive_config_dict = json.load(fh2)
+
+        main(model_path, out_dir, model_config_dict, olive_config_dict)
 
