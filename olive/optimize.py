@@ -187,16 +187,34 @@ def export_csv(csv_path, pretuning_result, tuning_results):
             return ort.GraphOptimizationLevel.ORT_DISABLE_ALL.name
         raise Exception("Invalid graph optimization level")
 
+    def pt(x):
+        return x
+
+    env_vars = {
+        'OMP_WAIT_POLICY': pt,
+        'OMP_NUM_THREADS': pt,
+        'KMP_AFFINITY': pt,
+        'OMP_MAX_ACTIVE_LEVELS': pt,
+        'ORT_TENSORRT_FP16_ENABLE': pt
+    }
+
+    session_opts = {
+        'execution_mode': execution_mode_col,
+        'inter_op_num_threads': pt,
+        'intra_op_num_threads': pt,
+        'graph_optimization_level': graph_opt_level_col,
+        'concurrency_num': pt,
+    }
+
+    fieldnames = [
+        "execution_provider",
+    ] + list(session_opts.keys()) + list(env_vars.keys()) + [
+        "p99_ms",
+        "avg_ms",
+        "throughput",
+    ]
+
     with open(csv_path, "w") as csv_file:
-        fieldnames = [
-            "execution_provider",
-            "execution_mode",
-            "graph_opt",
-            "intra_op_threads",
-            "inter_op_threads",
-            "p99_ms",
-            "avg_ms",
-        ]
         csv_writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
         csv_writer.writeheader()
 
@@ -211,15 +229,15 @@ def export_csv(csv_path, pretuning_result, tuning_results):
             result_row = {}
             result_row["execution_provider"] = execution_provider_col(
                 result["execution_provider"])
-            result_row["execution_mode"] = execution_mode_col(
-                result["session_options"]["execution_mode"])
-            result_row["graph_opt"] = graph_opt_level_col(
-                result["session_options"]["graph_optimization_level"])
-            result_row["intra_op_threads"] = result["session_options"][
-                "intra_op_num_threads"]
-            result_row["inter_op_threads"] = result["session_options"][
-                "inter_op_num_threads"]
+
+            for key, func in session_opts.items():
+                result_row[key] = func(result["session_options"][key])
+
+            for key, func in env_vars.items():
+                result_row[key] = func(result["env_vars"][key])
+
             result_row["p99_ms"] = "{:.3f}".format(
                 result["latency_ms"]["latency_p99"])
-            result_row["avg_ms"] = "{:.3f}".format(result["latency_ms"]["avg"])                
+            result_row["avg_ms"] = "{:.3f}".format(result["latency_ms"]["avg"])
+            result_row["throughput"] = "{:.3f}".format(result["throughput"])
             csv_writer.writerow(result_row)

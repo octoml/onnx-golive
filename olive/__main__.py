@@ -83,6 +83,7 @@ def get_opt_config(args):
             if args.omp_max_active_levels else ["1"]
         inter_thread_num_list = [int(n) for n in args.inter_thread_num_list.split(",") if n != ""] if args.inter_thread_num_list else [None]
         intra_thread_num_list = [int(n) for n in args.intra_thread_num_list.split(",") if n != ""] if args.intra_thread_num_list else [None]
+        concurrency_num_list = [int(n) for n in args.concurrency_num_list.split(",") if n != ""] if args.concurrency_num_list else [1]
         ort_opt_level_list = [level for level in args.ort_opt_level_list.split(",") if level != ""] if args.ort_opt_level_list else ["all"]
         execution_mode_list = [e for e in args.execution_mode_list.split(",") if e != ""] if args.execution_mode_list else []
         omp_wait_policy_list = [p for p in args.omp_wait_policy_list.split(",") if p != ""] if args.omp_wait_policy_list else []
@@ -96,7 +97,7 @@ def get_opt_config(args):
             transformer_enabled=args.transformer_enabled,
             transformer_args=args.transformer_args,
             sample_input_data_path=args.sample_input_data_path,
-            concurrency_num_list=args.concurrency_num_list if args.concurrency_num_list else [1],
+            concurrency_num_list=concurrency_num_list,
             kmp_affinity=kmp_affinity,
             omp_max_active_levels=omp_max_active_levels,
             result_path=args.result_path if args.result_path else OLIVE_RESULT_PATH,
@@ -376,7 +377,7 @@ def main():
     parser_opt.add_argument("--transformer_enabled", help="whether enable transformer optimization", action="store_true")
     parser_opt.add_argument("--transformer_args", help="onnxruntime transformer optimizer args")
     parser_opt.add_argument("--sample_input_data_path", help="path to sample_input_data.npz")
-    parser_opt.add_argument("--concurrency_num_list", type=int, help="list of tuning process concurrency number")
+    parser_opt.add_argument("--concurrency_num_list", help="list of tuning process concurrency number")
     parser_opt.add_argument("--kmp_affinity", help="bind OpenMP* threads to physical processing units")
     parser_opt.add_argument("--omp_max_active_levels", help="maximum number of nested active parallel regions")
     parser_opt.add_argument("--inter_thread_num_list", help="list of inter thread number for perftuning")

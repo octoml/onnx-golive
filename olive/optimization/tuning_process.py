@@ -304,7 +304,8 @@ def get_latency(optimization_config, test_params, test_result=None, background_p
                     "inter_op_num_threads": str(test_params.get("inter_op_num_threads")),
                     "intra_op_num_threads": str(test_params.get("intra_op_num_threads")),
                     "execution_mode": str(test_params.get("execution_mode")),
-                    "graph_optimization_level": str(test_params.get("graph_optimization_level"))
+                    "graph_optimization_level": str(test_params.get("graph_optimization_level")),
+                    "concurrency_num": test_params.get("concurrency_num")
                 }
 
             test_result["latency_ms"] = {
