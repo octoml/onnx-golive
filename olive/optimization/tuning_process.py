@@ -44,11 +44,11 @@ def generate_tuning_combos(optimization_config):
     if optimization_config.openmp_enabled or version.parse(ort.__version__) <= version.parse('1.7.0'):
         tuning_combos = itertools.product(optimization_config.omp_wait_policy_list, optimization_config.kmp_affinity,
                                           optimization_config.omp_max_active_levels, optimization_config.providers_list,
-                                          optimization_config.execution_mode_list, optimization_config.ort_opt_level_list)
+                                          optimization_config.execution_mode_list, optimization_config.ort_opt_level_list, optimization_config.concurrency_num_list)
     else:
         tuning_combos = itertools.product([None], [None], [None],
                                           optimization_config.providers_list, optimization_config.execution_mode_list,
-                                          optimization_config.ort_opt_level_list)
+                                          optimization_config.ort_opt_level_list, optimization_config.concurrency_num_list)
     yield from tuning_combos
 
 
@@ -65,11 +65,13 @@ def threads_num_tuning(optimization_config, tuning_combo):
     provider = tuning_combo[3]
     execution_mode = tuning_combo[4]
     ort_opt_level = tuning_combo[5]
+    concurrency_num = tuning_combo[6]
 
     test_params = dict()
     test_params["execution_provider"] = provider
     test_params["execution_mode"] = execution_mode
     test_params["graph_optimization_level"] = ort_opt_level
+    test_params['concurrency_num'] = concurrency_num
 
     if provider == "TensorrtExecutionProvider" and optimization_config.trt_fp16_enabled:
         os.environ["ORT_TENSORRT_FP16_ENABLE"] = "1"
@@ -208,7 +210,7 @@ def create_inference_session(model_path, test_params=None):
     return onnx_session, session_name
 
 
-def get_benchmark(optimization_config, test_params=None):
+def get_benchmark(optimization_config, test_params={}):
 
     manager = Manager()
     test_result = manager.dict()
@@ -220,7 +222,9 @@ def get_benchmark(optimization_config, test_params=None):
                                args=(optimization_config, test_params, test_result))
 
     process_list = []
-    num_of_background = optimization_config.concurrency_num - 1
+    concurrency_num = test_params.get('concurrency_num', 1)
+
+    num_of_background = concurrency_num - 1
     if num_of_background > 0:
         synchronizer = Barrier(num_of_background + 1)
         for i in range(0, num_of_background):

@@ -81,6 +81,7 @@ def get_configurations(model_config_dict):
         dims.append(
             [('FP16=DISABLED', noop_transform), ('FP16=ENABLED', fp16_transform)])
 
+
     names = [[x[0] for x in dim] for dim in dims]
     funcs = [[x[1] for x in dim] for dim in dims]
     
@@ -113,7 +114,7 @@ def write_csv_summary(result_dir):
     out_file = os.path.join(result_dir, 'merged.csv')
 
     logger.info("Writing results to: " + out_file)
-    combined_csv.to_csv(out_file, index=True, encoding='utf-8')
+    combined_csv.to_csv(out_file, header=True, index=False,  encoding='utf-8')
 
 def load_optimization_config(model_path, olive_config_dict):
     opt_config = OptimizationConfig(
@@ -123,6 +124,9 @@ def load_optimization_config(model_path, olive_config_dict):
     return opt_config
 
 def main(model_path, result_dir, model_config_dict, olive_config_dict):
+
+    logging.info(f"Loaded model config: {model_config_dict}")
+    logging.info(f"Loaded olive config: {olive_config_dict}")
 
     for func_list, name_list in get_configurations(model_config_dict):
 

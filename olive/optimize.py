@@ -200,12 +200,12 @@ def export_csv(csv_path, pretuning_result, tuning_results):
         csv_writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
         csv_writer.writeheader()
 
-        pretuning_row = {key: None for key in fieldnames}
-        pretuning_row["p99_ms"] = "{:.3f}".format(
-            pretuning_result["latency_ms"]["latency_p99"])
-        pretuning_row["avg_ms"] = "{:.3f}".format(
-            pretuning_result["latency_ms"]["avg"])            
-        csv_writer.writerow(pretuning_row)
+        # pretuning_row = {key: None for key in fieldnames}
+        # pretuning_row["p99_ms"] = "{:.3f}".format(
+        #     pretuning_result["latency_ms"]["latency_p99"])
+        # pretuning_row["avg_ms"] = "{:.3f}".format(
+        #     pretuning_result["latency_ms"]["avg"])            
+        # csv_writer.writerow(pretuning_row)
 
         for result in tuning_results:
             result_row = {}

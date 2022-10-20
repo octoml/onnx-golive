@@ -27,7 +27,7 @@ class OptimizationConfig:
                  transformer_enabled=False,
                  transformer_args=None,
                  sample_input_data_path=None,
-                 concurrency_num=1,
+                 concurrency_num_list=[1],
                  kmp_affinity=["respect,none"],
                  omp_max_active_levels=["1"],
                  result_path=OLIVE_RESULT_PATH,
@@ -58,7 +58,7 @@ class OptimizationConfig:
         self.transformer_enabled = transformer_enabled
         self.transformer_args = transformer_args
         self.sample_input_data_path = sample_input_data_path
-        self.concurrency_num = concurrency_num
+        self.concurrency_num_list = concurrency_num_list
         self.kmp_affinity = kmp_affinity
         self.omp_max_active_levels = omp_max_active_levels
         self.result_path = result_path
@@ -79,12 +79,14 @@ class OptimizationConfig:
         self.threads_num = threads_num
         self.min_duration_sec = min_duration_sec
         self.run_all = run_all
+
+        max_concurrency = max(concurrency_num_list)
         if omp_wait_policy_list:
             self.omp_wait_policy_list = omp_wait_policy_list
-            if "ACTIVE" in [i.upper() for i in self.omp_wait_policy_list] and self.concurrency_num > 1:
+            if "ACTIVE" in [i.upper() for i in self.omp_wait_policy_list] and max_concurrency > 1:
                 logger.warning("Concurrent optimization with OMP_WAIT_POLICY=ACTIVE may take long time")
         else:
-            self.omp_wait_policy_list = ["PASSIVE"] if self.concurrency_num > 1 else ["ACTIVE", "PASSIVE"]
+            self.omp_wait_policy_list = ["PASSIVE"] if max_concurrency > 1 else ["ACTIVE", "PASSIVE"]
 
         self._ort_opt_level_map()
         self._execution_mode_map()

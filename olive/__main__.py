@@ -41,7 +41,7 @@ def get_opt_config(args):
             transformer_enabled=config_dict.get("transformer_enabled", False),
             transformer_args=config_dict.get("transformer_args"),
             sample_input_data_path=config_dict.get("sample_input_data_path"),
-            concurrency_num=config_dict.get("concurrency_num", 1),
+            concurrency_num_list=config_dict.get("concurrency_num_list", [1]),
             kmp_affinity=config_dict.get("kmp_affinity", ["respect,none"]),
             omp_max_active_levels=config_dict.get("omp_max_active_levels", ["1"]),
             result_path=config_dict.get("result_path", OLIVE_RESULT_PATH),
@@ -96,7 +96,7 @@ def get_opt_config(args):
             transformer_enabled=args.transformer_enabled,
             transformer_args=args.transformer_args,
             sample_input_data_path=args.sample_input_data_path,
-            concurrency_num=args.concurrency_num if args.concurrency_num else 1,
+            concurrency_num_list=args.concurrency_num_list if args.concurrency_num_list else [1],
             kmp_affinity=kmp_affinity,
             omp_max_active_levels=omp_max_active_levels,
             result_path=args.result_path if args.result_path else OLIVE_RESULT_PATH,
@@ -376,7 +376,7 @@ def main():
     parser_opt.add_argument("--transformer_enabled", help="whether enable transformer optimization", action="store_true")
     parser_opt.add_argument("--transformer_args", help="onnxruntime transformer optimizer args")
     parser_opt.add_argument("--sample_input_data_path", help="path to sample_input_data.npz")
-    parser_opt.add_argument("--concurrency_num", type=int, help="tuning process concurrency number")
+    parser_opt.add_argument("--concurrency_num_list", type=int, help="list of tuning process concurrency number")
     parser_opt.add_argument("--kmp_affinity", help="bind OpenMP* threads to physical processing units")
     parser_opt.add_argument("--omp_max_active_levels", help="maximum number of nested active parallel regions")
     parser_opt.add_argument("--inter_thread_num_list", help="list of inter thread number for perftuning")
