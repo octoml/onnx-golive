@@ -3,7 +3,7 @@ import threading
 import time
 import array
 
-import mlperf_loadgen as lg
+#import mlperf_loadgen as lg
 import numpy as np
 
 from ..constants import QUERY_COUNT, NANO_SEC, MILLI_SEC
