@@ -161,6 +161,8 @@ if __name__ == '__main__':
     model_config_path = sys.argv[2]
     olive_config_path = sys.argv[3]
 
+    logger.info(f"Testing model from {model_path}; {model_config_path}, {olive_config_path}")
+
     with open(model_config_path) as fh1, open(olive_config_path) as fh2:
         model_config_dict = json.load(fh1)
         olive_config_dict = json.load(fh2)
