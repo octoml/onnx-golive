@@ -9,7 +9,7 @@ ARG TRT_CONTAINER_VERSION=22.07
 FROM nvcr.io/nvidia/tensorrt:${TRT_CONTAINER_VERSION}-py3
 
 RUN python -m pip install --upgrade pip
-RUN pip install onnxruntime-gpu
+RUN pip install onnxruntime-gpu==1.12.1
 RUN pip install onnxmltools
 RUN pip install pandas
 
