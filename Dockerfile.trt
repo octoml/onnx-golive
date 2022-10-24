@@ -51,6 +51,6 @@ RUN pip install pandas
 #RUN pip install mlperf_loadgen --extra-index-url https://olivewheels.azureedge.net/test
 RUN pip install -e .
 
-conda update libstdcxx-ng
+RUN /opt/miniconda/bin/conda update libstdcxx-ng
 
 ENTRYPOINT [ "python", "./olive/preprocess.py"]
