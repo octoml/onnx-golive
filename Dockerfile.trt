@@ -21,4 +21,6 @@ COPY . /onnx-olive
 WORKDIR /onnx-olive
 RUN pip install -e .
 
+# Example invocation:
+# docker run -it --rm --gpus all -v /home/ubuntu/models:/models -v `pwd`/configs:/configs  octoml/olive:trt  /models/yolov5s_dynamic.onnx  /configs/yolov5s_dynamic.json /configs/config-trt-short.json
 ENTRYPOINT [ "python", "./olive/preprocess.py"]
