@@ -1,0 +1,7 @@
+{
+    "providers_list": ["tensorrt", "cuda"],
+    "trt_fp16_enabled": true,
+    "fp32_enabled": true,
+    "concurrency_num_list": [1, 2],
+    "run_all": true
+}
