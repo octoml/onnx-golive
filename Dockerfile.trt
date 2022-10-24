@@ -1,0 +1,49 @@
+# --------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
+# --------------------------------------------------------------
+# Dockerfile to run ONNXRuntime with TensorRT integration
+
+# nVidia TensorRT Base Image
+ARG TRT_CONTAINER_VERSION=22.07
+FROM nvcr.io/nvidia/tensorrt:${TRT_CONTAINER_VERSION}-py3
+
+ARG ONNXRUNTIME_REPO=https://github.com/Microsoft/onnxruntime
+ARG ONNXRUNTIME_BRANCH=v1.12.1
+ARG CMAKE_CUDA_ARCHITECTURES=37;50;52;60;61;70;75;80
+
+RUN apt-get update &&\
+    apt-get install -y sudo git bash unattended-upgrades
+RUN unattended-upgrade
+
+WORKDIR /code
+ENV PATH /usr/local/nvidia/bin:/usr/local/cuda/bin:/code/cmake-3.21.0-linux-x86_64/bin:/opt/miniconda/bin:${PATH}
+
+# Prepare onnxruntime repository & build onnxruntime with TensorRT
+RUN git clone --single-branch --branch ${ONNXRUNTIME_BRANCH} --recursive ${ONNXRUNTIME_REPO} onnxruntime &&\
+    /bin/sh onnxruntime/dockerfiles/scripts/install_common_deps.sh &&\
+    trt_version=${TRT_VERSION:0:3} &&\
+    /bin/sh onnxruntime/dockerfiles/scripts/checkout_submodules.sh ${trt_version} &&\
+    cd onnxruntime &&\
+    /bin/sh build.sh --parallel --build_shared_lib --cuda_home /usr/local/cuda --cudnn_home /usr/lib/x86_64-linux-gnu/ --use_tensorrt --tensorrt_home /usr/lib/x86_64-linux-gnu/ --config Release --build_wheel --skip_tests --skip_submodule_sync --cmake_extra_defines '"CMAKE_CUDA_ARCHITECTURES='${CMAKE_CUDA_ARCHITECTURES}'"' &&\
+    pip install /code/onnxruntime/build/Linux/Release/dist/*.whl &&\
+    cd ..
+
+# Install Olive
+
+#ENV DEBIAN_FRONTEND=noninteractive
+#RUN apt-get update && apt-get install -y software-properties-common
+#RUN add-apt-repository ppa:deadsnakes/ppa -y && \
+#    apt-get install -y python3.8 && \
+#    apt-get install -y python3-venv python3-pip
+#RUN ln -s /usr/bin
+
+COPY . /onnx-olive
+WORKDIR /onnx-olive
+
+RUN python -m pip install --upgrade pip
+RUN pip install onnxruntime-gpu==1.12.1
+#RUN pip install mlperf_loadgen --extra-index-url https://olivewheels.azureedge.net/test
+RUN pip install -e .
+
+ENTRYPOINT [ "python", "-m", "olive" ]
