@@ -3,5 +3,7 @@
     "trt_fp16_enabled": true,
     "fp32_enabled": true,
     "concurrency_num_list": [1, 2],
+    "inter_thread_num_list": [1],
+    "intra_thread_num_list": [1],
     "run_all": true
 }
