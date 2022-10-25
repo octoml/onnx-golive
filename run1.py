@@ -19,7 +19,7 @@ def run(
     st = time.time()
     for k in range(repeats):
         session.run(None, input_values)
-    return time.time() - st
+    return (time.time() - st) / repeats
 
 def get_input_shapes(onnx_model: onnx.ModelProto):
     shapes = {}
