@@ -2,7 +2,7 @@
     "providers_list": ["tensorrt", "cuda"],
     "trt_fp16_enabled": true,
     "fp32_enabled": true,
-    "concurrency_num_list": [1, 2],
+    "concurrency_num_list": [1, 2, 4, 8, 16],
     "inter_thread_num_list": [1],
     "intra_thread_num_list": [1],
     "run_all": true
