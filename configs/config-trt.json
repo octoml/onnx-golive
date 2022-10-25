@@ -5,5 +5,6 @@
     "concurrency_num_list": [1, 2, 4, 8, 16],
     "inter_thread_num_list": [1],
     "intra_thread_num_list": [1],
+    "execution_mode_list": ["sequential"],
     "run_all": true
 }
