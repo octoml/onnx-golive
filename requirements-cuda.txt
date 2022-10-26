@@ -1,4 +1,4 @@
 onnxruntime-gpu==1.12.1
 onnxmltools
 pandas
-
+ec2_metadata
