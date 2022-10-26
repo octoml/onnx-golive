@@ -4,6 +4,7 @@ RUN python -m pip install --upgrade pip
 RUN pip install onnxruntime-openvino==1.12.0
 RUN pip install onnxmltools
 RUN pip install pandas
+RUN pip install ec2_metadata
 
 #RUN pip install mlperf_loadgen --extra-index-url https://olivewheels.azureedge.net/test
 
