@@ -1,0 +1,4 @@
+{
+    "providers_list": ["cpu"],
+    "run_all": true
+}

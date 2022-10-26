@@ -1,4 +1,0 @@
-{
-    "providers_list": ["cpu", "cuda", "tensorrt"],
-    "run_all": true
-}
