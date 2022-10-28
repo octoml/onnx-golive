@@ -103,7 +103,7 @@ def load_optimization_config(model_path, olive_config_dict):
     )
     return opt_config
 
-def main(model_path, output_path, scratch_dir, rewrite_config, olive_config):
+def main(model_path, output_dir, rewrite_config, olive_config):
 
     logging.info(f"Loaded rewrite config: {rewrite_config}")
     logging.info(f"Loaded olive config: {olive_config}")
@@ -113,7 +113,7 @@ def main(model_path, output_path, scratch_dir, rewrite_config, olive_config):
         config_name = '|'.join(name_list)
         logger.info("Running configuration: " + config_name)
 
-        out_dir = os.path.join(scratch_dir, config_name)        
+        out_dir = os.path.join(output_dir, config_name)        
         pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
 
         with smart_open.open(model_path, 'rb') as fh:
@@ -130,15 +130,15 @@ def main(model_path, output_path, scratch_dir, rewrite_config, olive_config):
         optimize(opt_config)
 
     logging.info(f"Run complete; writing summarized results to {output_path}")
-    with smart_open.open(output_path, 'w') as fh:
-        write_csv_summary(scratch_dir, fh)
+    model_name = model_path.split('/')[-1]
+    write_csv_summary(output_dir, model_name)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("-c", "--config", help="config.json file for optimization", required=True)
     parser.add_argument("-i", "--input", help="path to input model", required=True, dest="_input")
-    parser.add_argument("-o", "--output", help="path to store final output")
-    parser.add_argument("-s", "--scratch", help="path to store scratch state (preserved for offline debugging)")
+    parser.add_argument("-o", "--output", help="path to store final output locally")
+#    parser.add_argument("-s", "--scratch", help="path to store scratch state (preserved for offline debugging)")
     parser.add_argument("-g", "--gpu", help="Use GPU", action='store_true')
 
     args = parser.parse_args()
@@ -146,13 +146,13 @@ if __name__ == '__main__':
     config_path = args.config
     input_path = args._input
     
-    timestamp = datetime.datetime.now().strftime("%d_%m_%Y_%H_%M_%S")
-    instance_type = get_instance_type()
-    output_path = args.output or f"{input_path}_{instance_type}_{timestamp}.csv"
-    
-    scratch_path = args.scratch or f"/tmp/{timestamp}"
+    # timestamp = datetime.datetime.now().strftime("%d_%m_%Y_%H_%M_%S")
+    # instance_type = get_instance_type()
+    # output_path = args.output or f"{input_path}_{instance_type}_{timestamp}.csv"
 
-    logging.info(f"Optimizing model {input_path}; output_path={output_path}; scratch={scratch_path}")
+    output_path = args.output or f"/tmp/{timestamp}"
+
+    logging.info(f"Optimizing model {input_path}; output={output_path}")
 
     with smart_open.open(config_path) as fh:
         config_dict = json.load(fh)
@@ -164,5 +164,5 @@ if __name__ == '__main__':
             olive_config = config_dict['olive_config_cpu']
             rewrite_config = config_dict['rewrite_config_cpu']
 
-        main(input_path, output_path, scratch_path, rewrite_config, olive_config)
+        main(input_path, output_path, rewrite_config, olive_config)
 

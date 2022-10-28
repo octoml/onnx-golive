@@ -8,7 +8,7 @@ from olive.instance_type import get_instance_type
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-def write_csv_summary(result_dir, out_phile):
+def write_csv_summary(result_dir, model_name):
     all_dfs = []
     instance_type = get_instance_type() or "UNKNOWN"
 
@@ -30,9 +30,9 @@ def write_csv_summary(result_dir, out_phile):
     combined_csv = pd.concat(all_dfs)
     combined_csv.insert(0, "instance_type", instance_type)
 
-    local_file = os.path.join(result_dir, 'merged.csv')
+    local_file = os.path.join(result_dir, f'{instance_type}_{model_name}.csv')
     combined_csv.to_csv(local_file, header=True, index=False, encoding='utf-8')
-    combined_csv.to_csv(out_phile, header=True, index=False,  encoding='utf-8')
+#    combined_csv.to_csv(out_phile, header=True, index=False,  encoding='utf-8')
 
 if __name__ == '__main__':
-    write_csv_summary(sys.argv[1])
+    write_csv_summary(sys.argv[1], "MODEL")
