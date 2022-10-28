@@ -155,6 +155,11 @@ if __name__ == '__main__':
 
     logging.info(f"Optimizing model {input_path}; output={output_path}")
 
+    local_model_copy = os.path.join(output_path, 'input.onnx')
+    with smart_open.open() as fh:
+        with open(local_model_copy, 'wb') as fh2:
+            fh2.write(fh.read())
+
     with smart_open.open(config_path) as fh:
         config_dict = json.load(fh)
 
@@ -165,5 +170,5 @@ if __name__ == '__main__':
             olive_config = config_dict['olive_config_cpu']
             rewrite_config = config_dict['rewrite_config_cpu']
 
-        main(input_path, output_path, rewrite_config, olive_config)
+        main(local_model_copy, output_path, rewrite_config, olive_config)
 
