@@ -12,7 +12,7 @@
     "rewrite_config_cuda": {
 	"batch_input_name": "images",
 	"batch_input_index": 0,
-	"batch_sizes": [1, 4, 16],
+	"batch_sizes": [1, 4, 16, 64],
 	"test_fp16": true
     },
     "olive_config_cpu": {

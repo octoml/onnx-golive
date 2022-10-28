@@ -20,6 +20,7 @@ from onnxruntime.tools import onnx_model_utils
 from olive.optimization_config import OptimizationConfig
 from olive.optimize import optimize
 from olive.merge_outputs import write_csv_summary
+from olive.instance_type import get_instance_type
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -146,7 +147,8 @@ if __name__ == '__main__':
     input_path = args._input
     
     timestamp = datetime.datetime.now().strftime("%d_%m_%Y_%H_%M_%S")
-    output_path = args.output or f"{input_path}_{timestamp}.csv"
+    instance_type = get_instance_type()
+    output_path = args.output or f"{input_path}_{instance_type}_{timestamp}.csv"
     
     scratch_path = args.scratch or f"/tmp/{timestamp}"
 

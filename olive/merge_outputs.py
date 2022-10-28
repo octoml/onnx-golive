@@ -2,21 +2,15 @@ import logging
 import os
 import sys
 import pandas as pd
-from ec2_metadata import ec2_metadata
+
+from olive.instance_type import get_instance_type
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-def get_aws_instance_type():
-    try:
-        return ec2_metadata.instance_type
-    except:
-        logger.info("Not an AWS host; returning empty host name")
-        return None
-
 def write_csv_summary(result_dir, out_phile):
     all_dfs = []
-    instance_type = get_aws_instance_type() or "UNKNOWN"
+    instance_type = get_instance_type() or "UNKNOWN"
 
     for sub_dir in os.listdir(result_dir):
         result_path = os.path.join(result_dir, sub_dir, 'olive_result.csv')
