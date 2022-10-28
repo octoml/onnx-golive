@@ -25,7 +25,7 @@ def go(gpu, argv):
     aws_keys = ['AWS_ACCESS_KEY_ID', 'AWS_SESSION_TOKEN','AWS_SECRET_ACCESS_KEY']
 
     args = ['sudo', f"--preserve-env={','.join(aws_keys)}",
-            'docker', 'run', '-it', '--rm', '--volume', '/tmp:/tmp']
+            'docker', 'run', '-it', '--rm', '--volume', '/home/ubuntu:/tmp']
     for key in aws_keys:
         args.extend(['--env', key])
     args.append(target)
