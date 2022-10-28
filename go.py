@@ -16,6 +16,8 @@ def go(gpu, argv):
 
     if not os.path.exists('onnx-golive'):
         run1("git clone https://github.com/octoml/onnx-golive.git")
+    else:
+        run1("git pull", cwd='onnx-golive')
 
     dockerfile = 'Dockerfile.cpu' if not gpu else 'Dockerfile.trt'
     target = 'octoml/olive:cpu' if not gpu else 'octoml/olive:trt'
