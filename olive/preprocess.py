@@ -146,10 +146,11 @@ if __name__ == '__main__':
     config_path = args.config
     input_path = args._input
     
-    # timestamp = datetime.datetime.now().strftime("%d_%m_%Y_%H_%M_%S")
+    
     # instance_type = get_instance_type()
     # output_path = args.output or f"{input_path}_{instance_type}_{timestamp}.csv"
 
+    timestamp = datetime.datetime.now().strftime("%d_%m_%Y_%H_%M_%S")
     output_path = args.output or f"/tmp/{timestamp}"
 
     logging.info(f"Optimizing model {input_path}; output={output_path}")
