@@ -1,0 +1,24 @@
+{
+    "olive_config_cuda": {
+	"providers_list": ["cuda"],
+	"concurrency_num_list": [1],
+	"inter_thread_num_list": [1],
+	"intra_thread_num_list": [1],
+	"execution_mode_list": ["sequential"],
+	"run_all": true
+    },
+    "rewrite_config_cuda": {
+	"test_fp16": true
+    },
+    "olive_config_cpu": {
+	"providers_list": ["cpu"],
+	"execution_mode_list": ["sequential"],
+	"concurrency_num_list": [1],
+	"intra_thread_num_list": [1],
+	"inter_thread_num_list": [1],
+	"run_all": true
+    },
+    "rewrite_config_cpu": {
+	"test_fp16": true
+    }
+}

@@ -14,11 +14,9 @@ def get_aws_instance_type():
         logger.info("Not an AWS host; returning empty host name")
         return None
 
-def write_csv_summary(result_dir):
+def write_csv_summary(result_dir, out_phile):
     all_dfs = []
     instance_type = get_aws_instance_type() or "UNKNOWN"
-
-    logger.info(f"Summarizing results from {result_dir}")
 
     for sub_dir in os.listdir(result_dir):
         result_path = os.path.join(result_dir, sub_dir, 'olive_result.csv')
@@ -38,10 +36,7 @@ def write_csv_summary(result_dir):
     combined_csv = pd.concat(all_dfs)
     combined_csv.insert(0, "instance_type", instance_type)
 
-    out_file = os.path.join(result_dir, 'merged.csv')
-
-    logger.info("Writing results to: " + out_file)
-    combined_csv.to_csv(out_file, header=True, index=False,  encoding='utf-8')
+    combined_csv.to_csv(out_phile, header=True, index=False,  encoding='utf-8')
 
 if __name__ == '__main__':
     write_csv_summary(sys.argv[1])

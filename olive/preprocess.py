@@ -1,3 +1,5 @@
+import argparse
+import datetime
 import itertools
 import json
 import logging
@@ -61,21 +63,21 @@ def batch_size_transform(input_name: str, input_index: int, batch_size: int):
 
     return _transform
 
-def get_configurations(model_config_dict):
+def get_configurations(rewrite_config):
     # A list of "dimensions", each containing a list of tuples of the form:
     # ("feature_name=feature_value", Callable)
     dims = []
-    if 'batch_input_name' in model_config_dict:
-        batch_input_name = model_config_dict['batch_input_name']
-        batch_input_index = model_config_dict['batch_input_index']
-        batch_sizes = model_config_dict['batch_sizes']
+    if 'batch_input_name' in rewrite_config:
+        batch_input_name = rewrite_config['batch_input_name']
+        batch_input_index = rewrite_config['batch_input_index']
+        batch_sizes = rewrite_config['batch_sizes']
 
         logger.info(f"Testing {batch_input_name}:{batch_input_index} over batch sizes: {batch_sizes}")
         dims.append(
             [(f"BATCH_SIZE={x}",
               batch_size_transform(batch_input_name, batch_input_index, x)) for x in  batch_sizes])
 
-    if 'test_fp16' in model_config_dict:
+    if 'test_fp16' in rewrite_config:
         logger.info("Enabling fp16 testing")
         dims.append(
             [('FP16=DISABLED', noop_transform), ('FP16=ENABLED', fp16_transform)])
@@ -98,19 +100,19 @@ def load_optimization_config(model_path, olive_config_dict):
     )
     return opt_config
 
-def main(model_path, result_dir, model_config_dict, olive_config_dict):
+def main(model_path, output_path, scratch_dir, rewrite_config, olive_config):
 
-    logging.info(f"Loaded model config: {model_config_dict}")
-    logging.info(f"Loaded olive config: {olive_config_dict}")
+    logging.info(f"Loaded rewrite config: {rewrite_config}")
+    logging.info(f"Loaded olive config: {olive_config}")
 
-    for func_list, name_list in get_configurations(model_config_dict):
+    for func_list, name_list in get_configurations(rewrite_config):
 
         config_name = '|'.join(name_list)
         logger.info("Running configuration: " + config_name)
 
-        out_dir = os.path.join(result_dir, config_name)        
+        out_dir = os.path.join(scratch_dir, config_name)        
         pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
-        
+
         onnx_model = load_model(model_path)
         
         for name, func in zip(name_list, func_list):
@@ -119,28 +121,42 @@ def main(model_path, result_dir, model_config_dict, olive_config_dict):
         converted_model_path = os.path.join(out_dir, 'converted_model.onnx')
         save_model(onnx_model, converted_model_path)
 
-        olive_config_dict['result_path'] = out_dir
-        opt_config = load_optimization_config(converted_model_path, olive_config_dict)
+        olive_config['result_path'] = out_dir
+        opt_config = load_optimization_config(converted_model_path, olive_config)
         optimize(opt_config)
 
-    logging.info("Run complete; writing summarized results")
-    write_csv_summary(result_dir)
+    logging.info(f"Run complete; writing summarized results to {output_path}")
+    write_csv_summary(scratch_dir, output_path)
 
 if __name__ == '__main__':
-    if len(sys.argv) < 4:
-        print("Usage: preprocess.py model_path model_config.json olive_config.json")
-        sys.exit(1)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-c", "--config", help="config.json file for optimization", required=True)
+    parser.add_argument("-i", "--input", help="path to input model", required=True, dest="_input")
+    parser.add_argument("-o", "--output", help="path to store final output")
+    parser.add_argument("-s", "--scratch", help="path to store scratch state (preserved for offline debugging)")
+    parser.add_argument("-g", "--gpu", help="Use GPU", action='store_true')
 
-    model_path = sys.argv[1]
-    out_dir = model_path + ".OUT"
-    model_config_path = sys.argv[2]
-    olive_config_path = sys.argv[3]
+    args = parser.parse_args()
 
-    logger.info(f"Testing model from {model_path}; {model_config_path}, {olive_config_path}")
+    config_path = args.config
+    input_path = args._input
+    
+    timestamp = datetime.datetime.now().strftime("%d_%m_%Y_%H_%M_%S")
+    output_path = args.output or f"{input_path}_{timestamp}.csv"
+    
+    scratch_path = args.scratch or f"/tmp/{timestamp}"
 
-    with open(model_config_path) as fh1, open(olive_config_path) as fh2:
-        model_config_dict = json.load(fh1)
-        olive_config_dict = json.load(fh2)
+    logging.info(f"Optimizing model {input_path}; output_path={output_path}; scratch={scratch_path}")
 
-        main(model_path, out_dir, model_config_dict, olive_config_dict)
+    with open(config_path) as fh:
+        config_dict = json.load(fh)
+
+        if args.gpu:
+            olive_config = config_dict['olive_config_cuda']
+            rewrite_config = config_dict['rewrite_config_cuda']
+        else:
+            olive_config = config_dict['olive_config_cpu']
+            rewrite_config = config_dict['rewrite_config_cpu']
+
+        main(input_path, output_path, scratch_path, rewrite_config, olive_config)
 
