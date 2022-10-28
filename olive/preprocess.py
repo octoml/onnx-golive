@@ -8,6 +8,8 @@ import pathlib
 import sys
 import tempfile
 
+import smart_open
+
 import onnx
 from onnxmltools.utils.float16_converter import convert_float_to_float16
 from onnxmltools.utils import load_model, save_model
@@ -113,7 +115,8 @@ def main(model_path, output_path, scratch_dir, rewrite_config, olive_config):
         out_dir = os.path.join(scratch_dir, config_name)        
         pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
 
-        onnx_model = load_model(model_path)
+        with smart_open.open(model_path, 'rb') as fh:
+            onnx_model = onnx.load_from_string(fh.read())
         
         for name, func in zip(name_list, func_list):
             onnx_model = func(onnx_model)
@@ -126,7 +129,8 @@ def main(model_path, output_path, scratch_dir, rewrite_config, olive_config):
         optimize(opt_config)
 
     logging.info(f"Run complete; writing summarized results to {output_path}")
-    write_csv_summary(scratch_dir, output_path)
+    with smart_open.open(output_path, 'w') as fh:
+        write_csv_summary(scratch_dir, fh)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -148,7 +152,7 @@ if __name__ == '__main__':
 
     logging.info(f"Optimizing model {input_path}; output_path={output_path}; scratch={scratch_path}")
 
-    with open(config_path) as fh:
+    with smart_open.open(config_path) as fh:
         config_dict = json.load(fh)
 
         if args.gpu:

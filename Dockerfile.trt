@@ -13,6 +13,7 @@ RUN pip install onnxruntime-gpu==1.12.1
 RUN pip install onnxmltools
 RUN pip install pandas
 RUN pip install ec2_metadata
+RUN pip install smart-open[s3]
 
 #RUN pip install mlperf_loadgen --extra-index-url https://olivewheels.azureedge.net/test
 
