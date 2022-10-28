@@ -116,7 +116,7 @@ def main(model_path, output_dir, rewrite_config, olive_config):
         out_dir = os.path.join(output_dir, config_name)        
         pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
 
-        with smart_open.open(model_path, 'rb') as fh:
+        with open(model_path, 'rb') as fh:
             onnx_model = onnx.load_from_string(fh.read())
         
         for name, func in zip(name_list, func_list):
@@ -154,9 +154,11 @@ if __name__ == '__main__':
     output_path = args.output or f"/tmp/{timestamp}"
 
     logging.info(f"Optimizing model {input_path}; output={output_path}")
-
+    
+    pathlib.Path(output_path).mkdir(parents=True, exist_ok=True)
     local_model_copy = os.path.join(output_path, 'input.onnx')
-    with smart_open.open(input_path, 'b') as fh:
+
+    with smart_open.open(input_path, 'rb') as fh:
         with open(local_model_copy, 'w+b') as fh2:
             fh2.write(fh.read())
 
