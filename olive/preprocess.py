@@ -130,8 +130,7 @@ def main(model_path, output_dir, rewrite_config, olive_config):
         optimize(opt_config)
 
     logging.info(f"Run complete; writing summarized results to {output_path}")
-    model_name = model_path.split('/')[-1]
-    write_csv_summary(output_dir, model_name)
+    write_csv_summary(output_dir)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -145,13 +144,13 @@ if __name__ == '__main__':
 
     config_path = args.config
     input_path = args._input
-    
-    
+   
     # instance_type = get_instance_type()
     # output_path = args.output or f"{input_path}_{instance_type}_{timestamp}.csv"
 
+    model_name = input_path.split('/')[-1]
     timestamp = datetime.datetime.now().strftime("%d_%m_%Y_%H_%M_%S")
-    output_path = args.output or f"/tmp/{timestamp}"
+    output_path = args.output or f"/tmp/{model_name}_{timestamp}"
 
     logging.info(f"Optimizing model {input_path}; output={output_path}")
     
