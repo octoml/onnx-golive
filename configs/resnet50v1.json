@@ -25,7 +25,7 @@
 	"run_all": true    
     },
     "rewrite_config_cpu": {
-	"batch_input_name": "images",
+	"batch_input_name": "data",
 	"batch_input_index": 0,
 	"batch_sizes": [1, 4],
 	"test_fp16": true
