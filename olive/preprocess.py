@@ -156,8 +156,8 @@ if __name__ == '__main__':
     logging.info(f"Optimizing model {input_path}; output={output_path}")
 
     local_model_copy = os.path.join(output_path, 'input.onnx')
-    with smart_open.open(input_path) as fh:
-        with open(local_model_copy, 'wb') as fh2:
+    with smart_open.open(input_path, 'b') as fh:
+        with open(local_model_copy, 'w+b') as fh2:
             fh2.write(fh.read())
 
     with smart_open.open(config_path) as fh:
