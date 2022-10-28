@@ -30,6 +30,8 @@ def write_csv_summary(result_dir, out_phile):
     combined_csv = pd.concat(all_dfs)
     combined_csv.insert(0, "instance_type", instance_type)
 
+    local_file = os.path.join(result_dir, 'merged.csv')
+    combined_csv.to_csv(local_file, header=True, index=False, encoding='utf-8')
     combined_csv.to_csv(out_phile, header=True, index=False,  encoding='utf-8')
 
 if __name__ == '__main__':
