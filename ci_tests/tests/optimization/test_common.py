@@ -57,8 +57,7 @@ def test_generate_test_name():
 
 
 def test_create_inference_session_1():
-    model_path = ONNX_MODEL_PATH
-    _, session_name = create_inference_session(model_path)
+    session_name = generate_test_name(None)
     assert session_name == "pretuning"
 
 
@@ -67,8 +66,9 @@ def test_create_inference_session_2():
     test_params = {"execution_provider": "CPUExecutionProvider",
                    "execution_mode": ort.ExecutionMode.ORT_SEQUENTIAL,
                    "inter_op_num_threads": 2}
-    onnx_session, session_name = create_inference_session(model_path, test_params)
+    session_name = generate_test_name(test_params)
     assert session_name == "execution_provider_CPUExecutionProvider_execution_mode_ExecutionMode.ORT_SEQUENTIAL_inter_op_num_threads_2"
+    onnx_session = create_inference_session(model_path, test_params)
     assert onnx_session.get_session_options().inter_op_num_threads == 2
     assert onnx_session.get_session_options().execution_mode == ort.ExecutionMode.ORT_SEQUENTIAL
     assert onnx_session.get_providers() == ["CPUExecutionProvider"]
