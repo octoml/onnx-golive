@@ -8,7 +8,11 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger(__name__)
 
 def get_aws_instance_type():
-    return ec2_metadata.instance_type
+    try:
+        return ec2_metadata.instance_type
+    except:
+        logger.info("Not an AWS host; returning empty host name")
+        return None
 
 def write_csv_summary(result_dir):
     all_dfs = []
