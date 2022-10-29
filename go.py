@@ -15,7 +15,6 @@ def run1(c, cwd=None):
         subprocess.check_call(c, shell=True, cwd=cwd)
 
 def go(gpu, argv):
-#    run1("sudo snap install docker")
 
     dockerfile = 'Dockerfile.cpu' if not gpu else 'Dockerfile.trt'
     target = 'octoml/olive:cpu' if not gpu else 'octoml/olive:trt'

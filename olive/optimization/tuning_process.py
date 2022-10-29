@@ -3,20 +3,23 @@ import logging
 import os
 import re
 import time
-from multiprocessing import Barrier, Process, Manager
+from copy import copy
+from multiprocessing import Barrier, Manager, Process
 
 import numpy as np
 import onnxruntime as ort
 from packaging import version
 
+from ..constants import ONNX_TO_NP_TYPE_MAP, SUB_PROCESS_NAME_PREFIX
 from .mlperf_dataset import Dataset
 from .server_runner import ServerRunner
-from ..constants import SUB_PROCESS_NAME_PREFIX, ONNX_TO_NP_TYPE_MAP
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 ort.set_default_logger_severity(3)
+
+PRETUNING_SESSION_NAME = "pretuning"
 
 
 def tune_onnx_model(optimization_config):
@@ -82,7 +85,6 @@ def threads_num_tuning(optimization_config, tuning_combo):
             for intra in optimization_config.intra_thread_num_list:
                 test_params["intra_op_num_threads"] = intra
                 threads_num_binary_search(optimization_config, test_params, tuning_results, cpu_cores)
-
     except Exception:
         logger.error("Optimization failed for tuning combo {}".format(tuning_combo))
         pass
@@ -95,7 +97,6 @@ def threads_num_tuning(optimization_config, tuning_combo):
                 for intra in optimization_config.intra_thread_num_list:
                     test_params["intra_op_num_threads"] = intra
                     threads_num_binary_search(optimization_config, test_params, tuning_results, cpu_cores)
-
         except Exception:
             logger.error("Optimization failed for tuning combo {}".format(tuning_combo))
             pass
@@ -120,7 +121,7 @@ def threads_num_binary_search(optimization_config, test_params, tuning_results, 
             best_throughput = test_result["throughput"]
         else:
             best_latency = test_result["latency_ms"]["avg"]
-    
+
     else:
         for threads_name in threads_names:
             thread_num = test_params.get(threads_name)
@@ -166,6 +167,8 @@ def threads_num_binary_search(optimization_config, test_params, tuning_results, 
 
 
 def generate_test_name(test_params):
+    if not test_params:
+        return PRETUNING_SESSION_NAME
     test_name = "_".join(["_".join([str(v) for v in i]) for i in test_params.items()])
     for env_var in ["OMP_WAIT_POLICY", "KMP_AFFINITY", "OMP_MAX_ACTIVE_LEVELS"]:
         env_val = os.getenv(env_var)
@@ -174,15 +177,12 @@ def generate_test_name(test_params):
     return test_name
 
 
-def create_inference_session(model_path, test_params=None):
+def create_inference_session(model_path, test_params=None, available_providers=None):
     sess_options = ort.SessionOptions()
-
     if version.parse(ort.__version__) >= version.parse("1.11.0"):
         sess_options.add_session_config_entry('session.dynamic_block_base', '4')
 
     if test_params:
-        session_name = generate_test_name(test_params)
-
         execution_provider = test_params.get("execution_provider")
         inter_op_num_threads = test_params.get("inter_op_num_threads")
         intra_op_num_threads = test_params.get("intra_op_num_threads")
@@ -201,148 +201,177 @@ def create_inference_session(model_path, test_params=None):
             onnx_session = ort.InferenceSession(model_path, sess_options, providers=[execution_provider])
         else:
             onnx_session = ort.InferenceSession(model_path, sess_options)
-
     else:
-        session_name = "pretuning"
-        execution_provider = "CUDAExecutionProvider" if "CUDAExecutionProvider" in ort.get_available_providers() else "CPUExecutionProvider"
+        available_providers = available_providers if available_providers else ort.get_available_providers()
+        execution_provider = "CUDAExecutionProvider" if "CUDAExecutionProvider" in available_providers else "CPUExecutionProvider"
+        logger.info("Using default provider {}".format(execution_provider))
         onnx_session = ort.InferenceSession(model_path, sess_options, providers=[execution_provider])
-
-    return onnx_session, session_name
+    return onnx_session
 
 
 def get_benchmark(optimization_config, test_params={}):
-
-    manager = Manager()
-    test_result = manager.dict()
     if optimization_config.throughput_tuning_enabled:
+        # throughput tuning uses the main process for results (are they extrapolated?)
+        # the other processes are there to simulate load
+        manager = Manager()
+        test_result = manager.dict()
         main_process = Process(name="main_process", target=get_throughput,
                                args=(optimization_config, test_params, test_result))
+
+        process_list = []
+        concurrency_num = test_params.get('concurrency_num', 1)
+
+        num_of_background = concurrency_num - 1
+        if num_of_background > 0:
+            synchronizer = Barrier(num_of_background + 1)
+            for i in range(0, num_of_background):
+                p = Process(name="{}_{}".format(SUB_PROCESS_NAME_PREFIX, i), target=get_throughput,
+                            args=(optimization_config, test_params, None, synchronizer))
+                p.start()
+                logger.info("PID [{}] started".format(p.pid))
+                process_list.append(p)
+            synchronizer.wait()
+
+        # execute main func, we only collect benchmark from this main func
+        main_process.start()
+        main_process.join()
+
+        # once the main func finished, stop child process
+        for p in process_list:
+            if p.is_alive():
+                p.terminate()
+                logger.info("PID {} killed".format(p.pid))
+        return dict(test_result)
     else:
-        main_process = Process(name="main_process", target=get_latency,
-                               args=(optimization_config, test_params, test_result))
+        test_result = benchmark_latency(optimization_config, test_params)
+        return test_result
 
-    process_list = []
-    concurrency_num = test_params.get('concurrency_num', 1)
 
-    num_of_background = concurrency_num - 1
-    if num_of_background > 0:
-        synchronizer = Barrier(num_of_background + 1)
-        for i in range(0, num_of_background):
-            p = Process(name="{}_{}".format(SUB_PROCESS_NAME_PREFIX, i), target=concurrent_inference,
-                        args=(synchronizer, optimization_config, test_params))
+def benchmark_latency(optimization_config, test_params):
+    # Session name will be "pretuning" if there are no parameters
+    session_name = generate_test_name(test_params)
+
+    manager = Manager()
+    latencies = manager.list()
+
+    # Do a warm up in the main process to test for an early out
+    should_perform_test_run = True
+    if test_params and not optimization_config.run_all:
+        # Number of tests to determine early out criteria
+        EARLYOUT_TEST_COUNT = 20
+        # Skip test if latencies are X times more than pretuning
+        EARLYOUT_LATENCY_FACTOR = 5
+
+        earlyout_optimization_config = copy(optimization_config)
+        earlyout_optimization_config.test_num = EARLYOUT_TEST_COUNT
+        earlyout_latencies = []
+        get_latency(earlyout_optimization_config, test_params, earlyout_latencies)
+
+        earlyout_latency_ms = sum(earlyout_latencies) / len(earlyout_latencies) * 1000
+        if (earlyout_latency_ms > (earlyout_optimization_config.pretuning_latency_ms * EARLYOUT_LATENCY_FACTOR)):
+            should_perform_test_run = False
+            latencies.extend(earlyout_latencies)
+            session_name += "_earlyout"
+
+    # Perform the test run if we haven't eliminated this config via early out testing above
+    if should_perform_test_run:
+        concurrency_num = test_params.get('concurrency_num', 1)
+        process_list = []
+        synchronizer = Barrier(concurrency_num+1)
+
+        for i in range(0, concurrency_num):
+            p = Process(name="{}_{}".format(SUB_PROCESS_NAME_PREFIX, i), target=get_latency,
+                        args=(optimization_config, test_params, latencies, synchronizer))
             p.start()
+            logger.info("[{}] process started".format(p.pid))
             process_list.append(p)
+
         synchronizer.wait()
 
-    # execute main func, we only collect benchmark from this main func
-    main_process.start()
-    main_process.join()
-
-    # once the main func finished, stop child process
-    for p in process_list:
-        if p.is_alive():
+        for p in process_list:
+            p.join()
+            logger.info("[{}] process finished".format(p.pid))
             p.terminate()
-            logger.info("PID {} is killed".format(p.pid))
-
-    return dict(test_result)
 
 
-def concurrent_inference(synchronizer, optimization_config, test_params=None):
-    logger.info("[{}] process start".format(os.getpid()))
-    synchronizer.wait()
+    # Aggregate latencies to test results
+    test_result = dict()
+    test_result["test_name"] = session_name
+    if test_params:
+        test_result["execution_provider"] = test_params.get("execution_provider")
+        test_result["env_vars"] = {
+            "OMP_WAIT_POLICY": str(os.getenv("OMP_WAIT_POLICY")),
+            "OMP_NUM_THREADS": str(os.getenv("OMP_NUM_THREADS")),
+            "KMP_AFFINITY": str(os.getenv("KMP_AFFINITY")),
+            "OMP_MAX_ACTIVE_LEVELS": str(os.getenv("OMP_MAX_ACTIVE_LEVELS")),
+            "ORT_TENSORRT_FP16_ENABLE": str(os.getenv("ORT_TENSORRT_FP16_ENABLE", 0))
+        }
+        test_result["session_options"] = {
+            "inter_op_num_threads": str(test_params.get("inter_op_num_threads")),
+            "intra_op_num_threads": str(test_params.get("intra_op_num_threads")),
+            "execution_mode": str(test_params.get("execution_mode")),
+            "graph_optimization_level": str(test_params.get("graph_optimization_level")),
+            "concurrency_num": test_params.get("concurrency_num")
+        }
 
-    # execute inference
-    if optimization_config.throughput_tuning_enabled:
-        get_throughput(optimization_config=optimization_config, test_params=test_params, background_process=True)
-    else:
-        get_latency(optimization_config=optimization_config, test_params=test_params, background_process=True)
-
-    logger.info("[{}] process finished".format(os.getpid()))
-
-
-def validate_latency(onnx_session, onnx_output_names, inference_input_dict, pretuning_latency_ms):
-    latencies = []
-    for i in range (20):
-        t = time.perf_counter()
-        onnx_session.run(onnx_output_names, inference_input_dict)
-        latencies.append(time.perf_counter() - t)
-    latency_ms = sum(latencies) / len(latencies) * 1000
-    return latency_ms < pretuning_latency_ms * 10
+    test_result["latency_ms"] = {
+        "avg": round(sum(latencies) / len(latencies) * 1000, 5),
+        "latency_p50": round(np.percentile(latencies, 50) * 1000, 5),
+        "latency_p75": round(np.percentile(latencies, 75) * 1000, 5),
+        "latency_p90": round(np.percentile(latencies, 90) * 1000, 5),
+        "latency_p95": round(np.percentile(latencies, 95) * 1000, 5),
+        "latency_p99": round(np.percentile(latencies, 99) * 1000, 5),
+        "latency_p999": round(np.percentile(latencies, 99.9) * 1000, 5),
+    }
+    logger.info("ONNX model average inference time = {} for test {}".format(test_result["latency_ms"]["avg"], session_name))
+    test_result["throughput"] = 1000 / test_result["latency_ms"]["avg"] if test_result["latency_ms"]["avg"] != 0 else "null"
+    return test_result
 
 
-def get_latency(optimization_config, test_params, test_result=None, background_process=False):
-    onnx_session, session_name = create_inference_session(optimization_config.model_path, test_params)
+def get_latency(optimization_config, test_params, latency_results, synchronizer=None):
+    onnx_session = create_inference_session(optimization_config.model_path, test_params, optimization_config.providers_list)
     onnx_output_names = optimization_config.output_names if optimization_config.output_names else [o.name for o in onnx_session.get_outputs()]
 
     # warmup
     for i in range(optimization_config.warmup_num):
         onnx_session.run(onnx_output_names, optimization_config.inference_input_dict)
 
+    if synchronizer:
+        synchronizer.wait()
+
     # run test
-    if ((session_name == "pretuning") or 
-        (optimization_config.run_all or 
-         validate_latency(onnx_session, onnx_output_names, optimization_config.inference_input_dict, optimization_config.pretuning_latency_ms))):
-        latencies = []
-        for i in range(optimization_config.test_num):
-            t = time.perf_counter()
-            onnx_session.run(onnx_output_names, optimization_config.inference_input_dict)
-            latencies.append(time.perf_counter() - t)
+    latencies = []
+    for _ in range(optimization_config.test_num):
+        t = time.perf_counter()
+        onnx_session.run(onnx_output_names, optimization_config.inference_input_dict)
+        latencies.append(time.perf_counter() - t)
 
-        if not background_process:
-            test_result["test_name"] = session_name
-
-            if test_params:
-                test_result["execution_provider"] = test_params.get("execution_provider")
-                test_result["env_vars"] = {
-                    "OMP_WAIT_POLICY": str(os.getenv("OMP_WAIT_POLICY")),
-                    "OMP_NUM_THREADS": str(os.getenv("OMP_NUM_THREADS")),
-                    "KMP_AFFINITY": str(os.getenv("KMP_AFFINITY")),
-                    "OMP_MAX_ACTIVE_LEVELS": str(os.getenv("OMP_MAX_ACTIVE_LEVELS")),
-                    "ORT_TENSORRT_FP16_ENABLE": str(os.getenv("ORT_TENSORRT_FP16_ENABLE", 0))
-                }
-                test_result["session_options"] = {
-                    "inter_op_num_threads": str(test_params.get("inter_op_num_threads")),
-                    "intra_op_num_threads": str(test_params.get("intra_op_num_threads")),
-                    "execution_mode": str(test_params.get("execution_mode")),
-                    "graph_optimization_level": str(test_params.get("graph_optimization_level")),
-                    "concurrency_num": test_params.get("concurrency_num")
-                }
-
-            test_result["latency_ms"] = {
-                "avg": round(sum(latencies) / len(latencies) * 1000, 5),
-                "latency_p50": round(np.percentile(latencies, 50) * 1000, 5),
-                "latency_p75": round(np.percentile(latencies, 75) * 1000, 5),
-                "latency_p90": round(np.percentile(latencies, 90) * 1000, 5),
-                "latency_p95": round(np.percentile(latencies, 95) * 1000, 5),
-                "latency_p99": round(np.percentile(latencies, 99) * 1000, 5),
-                "latency_p999": round(np.percentile(latencies, 99.9) * 1000, 5),
-            }
-
-            logger.info("ONNX model average inference time = {} for test {}".format(test_result["latency_ms"]["avg"], session_name))
-            test_result["throughput"] = 1000 / test_result["latency_ms"]["avg"] if test_result["latency_ms"]["avg"] != 0 else "null"
-
-    else:
-        logger.info("Skip test {} for latency reason".format(session_name))
+    latency_results.extend(latencies)
 
 
-def get_throughput(optimization_config, test_params, test_result=None, background_process=False):
-    onnx_session, session_name = create_inference_session(optimization_config.model_path, test_params)
+def get_throughput(optimization_config, test_params, test_result=None, synchronizer=None):
+    onnx_session = create_inference_session(optimization_config.model_path, test_params, optimization_config.providers_list)
     onnx_output_names = optimization_config.output_names if optimization_config.output_names else [o.name for o in onnx_session.get_outputs()]
-    ds = Dataset(onnx_session, optimization_config.inputs_spec)
 
+    # create server runner
+    ds = Dataset(onnx_session, optimization_config.inputs_spec)
     runner = ServerRunner(onnx_session, ds, optimization_config, onnx_output_names)
+
     # warmup
     runner.warmup(optimization_config.warmup_num)
+
+    if synchronizer:
+        synchronizer.wait()
 
     # run test
     runner.start_run()
     runner.finish()
 
-    if not background_process:
+    if test_result:
+        session_name = generate_test_name(test_params)
         is_valid, latency_result, throughput_result = parse_mlperf_log(optimization_config.result_path)
         if is_valid:
             test_result["test_name"] = session_name
-
             if test_params:
                 test_result["execution_provider"] = test_params.get("execution_provider")
                 test_result["env_vars"] = {
