@@ -1,6 +1,0 @@
-{
-    "batch_input_name": "images",
-    "batch_input_index": 0,
-    "batch_sizes": [1, 4, 16],
-    "test_fp16": true
-}
