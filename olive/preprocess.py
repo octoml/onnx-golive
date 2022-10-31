@@ -130,36 +130,18 @@ def main(model_path, output_dir, rewrite_config, olive_config):
         optimize(opt_config)
 
     logging.info(f"Run complete; writing summarized results to {output_path}")
-    write_csv_summary(output_dir)
+#    write_csv_summary(output_dir)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("-c", "--config", help="config.json file for optimization", required=True)
-    parser.add_argument("-i", "--input", help="path to input model", required=True, dest="_input")
+    parser.add_argument("-i", "--input", help="path to input model", dest="_input")
     parser.add_argument("-o", "--output", help="path to store final output locally")
-#    parser.add_argument("-s", "--scratch", help="path to store scratch state (preserved for offline debugging)")
     parser.add_argument("-g", "--gpu", help="Use GPU", action='store_true')
 
     args = parser.parse_args()
 
     config_path = args.config
-    input_path = args._input
-   
-    # instance_type = get_instance_type()
-    # output_path = args.output or f"{input_path}_{instance_type}_{timestamp}.csv"
-
-    model_name = input_path.split('/')[-1]
-    timestamp = datetime.datetime.now().strftime("%d_%m_%Y_%H_%M_%S")
-    output_path = args.output or f"/tmp/{model_name}_{timestamp}"
-
-    logging.info(f"Optimizing model {input_path}; output={output_path}")
-    
-    pathlib.Path(output_path).mkdir(parents=True, exist_ok=True)
-    local_model_copy = os.path.join(output_path, 'input.onnx')
-
-    with smart_open.open(input_path, 'rb') as fh:
-        with open(local_model_copy, 'w+b') as fh2:
-            fh2.write(fh.read())
 
     with smart_open.open(config_path) as fh:
         config_dict = json.load(fh)
@@ -171,5 +153,22 @@ if __name__ == '__main__':
             olive_config = config_dict['olive_config_cpu']
             rewrite_config = config_dict['rewrite_config_cpu']
 
-        main(local_model_copy, output_path, rewrite_config, olive_config)
+        model_path = config_dict.get("model_path", None) or args._input
+
+    model_name = model_path.split('/')[-1]
+    timestamp = datetime.datetime.now().strftime("%d_%m_%Y_%H_%M_%S")
+    output_path = args.output or f"/tmp/{model_name}_{timestamp}"
+
+    assert model_path
+    pathlib.Path(output_path).mkdir(parents=True, exist_ok=True)
+    local_model_copy = os.path.join(output_path, 'input.onnx')
+
+    with smart_open.open(model_path, 'rb') as fh:
+        logging.info(f"Fetching local copy: {model_path} => {local_model_copy}")
+        with open(local_model_copy, 'w+b') as fh2:
+            fh2.write(fh.read())
+
+    main(local_model_copy, output_path, rewrite_config, olive_config)
+
+
 

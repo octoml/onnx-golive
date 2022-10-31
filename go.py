@@ -22,7 +22,7 @@ def go(gpu, argv):
     run1(f"sudo docker build -t {target} -f {dockerfile} .")
 
     home = str(Path.home())
-    args = ['docker', 'run', '-it', '--rm', '--volume', f'{home}:/tmp']
+    args = ['docker', 'run', '-it', '--rm', '--volume', f'{home}:/tmp', '--volume', './configs:/configs']
 
     if gpu:
         args.extend(['--gpus', 'all'])
