@@ -19,7 +19,7 @@ def go(gpu, argv):
     dockerfile = 'Dockerfile.cpu' if not gpu else 'Dockerfile.trt'
     target = 'octoml/olive:cpu' if not gpu else 'octoml/olive:trt'
 
-    run1(f"sudo docker build -t {target} -f {dockerfile} .")
+    run1(f"docker build -t {target} -f {dockerfile} .")
 
     home = str(Path.home())
     args = ['docker', 'run', '-it', '--rm', '--volume', f'{home}:/tmp', '--volume', './configs:/configs']
