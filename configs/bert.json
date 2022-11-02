@@ -1,4 +1,5 @@
 {
+    "model_path": "s3://octoml-hwi-testing/bert.onnx",
     "olive_config_cuda": {
 	"providers_list": ["tensorrt", "cuda"],
 	"trt_fp16_enabled": true,
