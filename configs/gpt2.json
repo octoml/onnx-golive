@@ -1,0 +1,28 @@
+{
+    "model_path": "s3://octoml-hwi-testing/gpt2-10.onnx",
+    "input_sizes": {"input1": [1,1,8]},
+    "olive_config_cuda": {
+	"providers_list": ["tensorrt", "cuda"],
+	"trt_fp16_enabled": true,
+	"fp32_enabled": true,
+	"concurrency_num_list": [1, 2, 4],
+	"inter_thread_num_list": [1],
+	"intra_thread_num_list": [1],
+	"execution_mode_list": ["sequential"],
+	"run_all": true
+    },
+    "rewrite_config_cuda": {
+	"test_fp16": true
+    },
+    "olive_config_cpu": {
+	"providers_list": ["cpu", "openvino"],
+	"openmp_enabled": true,
+	"execution_mode_list": ["parallel"],
+	"concurrency_num_list": [1, 2, 4, 8, 16],
+	"intra_thread_num_list": [1, 2, 4, 8, 16],
+	"inter_thread_num_list": [1, 2, 4],
+	"run_all": true
+    },
+    "rewrite_config_cpu": {
+    }
+}
