@@ -79,12 +79,15 @@ def get_configurations(rewrite_config):
         dims.append(
             [(f"BATCH_SIZE={x}",
               batch_size_transform(batch_input_name, batch_input_index, x)) for x in  batch_sizes])
+    else:
+        dims.append([("BATCH_SIZE=1", noop_transform)])
 
     if 'test_fp16' in rewrite_config:
         logger.info("Enabling fp16 testing")
         dims.append(
             [('FP16=DISABLED', noop_transform), ('FP16=ENABLED', fp16_transform)])
-
+    else:
+        dims.append([("FP16=DISABLED", noop_transform)])
 
     names = [[x[0] for x in dim] for dim in dims]
     funcs = [[x[1] for x in dim] for dim in dims]
