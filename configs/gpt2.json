@@ -15,11 +15,11 @@
 	"test_fp16": true
     },
     "olive_config_cpu": {
-	"providers_list": ["cpu", "openvino"],
+	"providers_list": ["cpu"],
 	"openmp_enabled": true,
 	"execution_mode_list": ["parallel"],
-	"concurrency_num_list": [1, 2, 4, 8, 16],
-	"intra_thread_num_list": [1, 2, 4, 8, 16],
+	"concurrency_num_list": [1, 2, 4, 16],
+	"intra_thread_num_list": [1, 2, 4, 16],
 	"inter_thread_num_list": [1, 2, 4],
 	"run_all": true
     },
