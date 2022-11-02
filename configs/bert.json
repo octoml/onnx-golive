@@ -20,9 +20,11 @@
 	"concurrency_num_list": [1, 2, 4, 8, 16],
 	"intra_thread_num_list": [1, 2, 4, 8, 16],
 	"inter_thread_num_list": [1, 2, 4],
-	"run_all": true    
+	"run_all": true
     },
     "rewrite_config_cpu": {
-	"test_fp16": true
+        "batch_input_name": "input_ids",
+	"batch_input_index": 0,
+	"batch_sizes": [1]
     }
 }
