@@ -7,8 +7,8 @@ import onnxruntime as ort
 
 from olive.constants import ONNX_TO_NP_TYPE_MAP
 
-WARMUP_COUNT = 1
-BENCHMARK_COUNT = 10
+WARMUP_COUNT = 5
+BENCHMARK_COUNT = 50
 
 def run(
     onnx_model: onnx.ModelProto,
