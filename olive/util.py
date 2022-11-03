@@ -1,3 +1,4 @@
+from time import perf_counter_ns
 import numpy as np
 
 
@@ -35,3 +36,20 @@ def if_enumerable(data):
         return True
     except TypeError as e:
         return False
+
+
+def benchmark(
+    fn,
+    warmup_count: int,
+    benchmark_count: int,
+):
+
+    for _ in range(warmup_count):
+        fn()
+
+    start_ns = perf_counter_ns()
+    for _ in range(benchmark_count):
+        fn()
+    elapsed_ns = perf_counter_ns() - start_ns
+    average_ms = elapsed_ns / benchmark_count / 1e6
+    return (average_ms, benchmark_count)        
