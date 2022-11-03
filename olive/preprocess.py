@@ -79,12 +79,15 @@ def get_configurations(rewrite_config):
         dims.append(
             [(f"BATCH_SIZE={x}",
               batch_size_transform(batch_input_name, batch_input_index, x)) for x in  batch_sizes])
+    else:
+        dims.append([("BATCH_SIZE=1", noop_transform)])
 
     if 'test_fp16' in rewrite_config:
         logger.info("Enabling fp16 testing")
         dims.append(
             [('FP16=DISABLED', noop_transform), ('FP16=ENABLED', fp16_transform)])
-
+    else:
+        dims.append([("FP16=DISABLED", noop_transform)])
 
     names = [[x[0] for x in dim] for dim in dims]
     funcs = [[x[1] for x in dim] for dim in dims]
@@ -110,7 +113,7 @@ def main(model_path, output_dir, rewrite_config, olive_config):
 
     for func_list, name_list in get_configurations(rewrite_config):
 
-        config_name = '|'.join(name_list)
+        config_name = '|'.join(name_list) if name_list else 'DEFAULT=0'
         logger.info("Running configuration: " + config_name)
 
         out_dir = os.path.join(output_dir, config_name)        
@@ -165,8 +168,14 @@ if __name__ == '__main__':
 
     with smart_open.open(model_path, 'rb') as fh:
         logging.info(f"Fetching local copy: {model_path} => {local_model_copy}")
-        with open(local_model_copy, 'w+b') as fh2:
-            fh2.write(fh.read())
+
+        model = onnx.load(fh)
+        if 'input_sizes' in config_dict:            
+            for input_name, input_shape in config_dict['input_sizes'].items():
+                logging.info(f"Setting {input_name} to shape {input_shape}")
+                onnx_model_utils.make_input_shape_fixed(model.graph, input_name, input_shape)
+
+        onnx.save(model, local_model_copy)
 
     main(local_model_copy, output_path, rewrite_config, olive_config)
 

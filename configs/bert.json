@@ -1,0 +1,30 @@
+{
+    "model_path": "s3://octoml-hwi-testing/bert.onnx",
+    "olive_config_cuda": {
+	"providers_list": ["tensorrt", "cuda"],
+	"trt_fp16_enabled": true,
+	"fp32_enabled": true,
+	"concurrency_num_list": [1, 2, 4],
+	"inter_thread_num_list": [1],
+	"intra_thread_num_list": [1],
+	"execution_mode_list": ["sequential"],
+	"run_all": true
+    },
+    "rewrite_config_cuda": {
+	"test_fp16": true
+    },
+    "olive_config_cpu": {
+	"providers_list": ["cpu"],
+	"openmp_enabled": true,
+	"execution_mode_list": ["parallel"],
+	"concurrency_num_list": [1, 2, 4, 16],
+	"intra_thread_num_list": [1, 2, 4, 16],
+	"inter_thread_num_list": [1, 2, 4],
+	"run_all": true
+    },
+    "rewrite_config_cpu": {
+        "batch_input_name": "input_ids",
+	"batch_input_index": 0,
+	"batch_sizes": [1]
+    }
+}
