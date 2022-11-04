@@ -27,6 +27,8 @@ TENSORFLOW_DTYPE_TO_STRING = {
     tf.string: "str",
 }
 
+NLP_INPUT = "Hello, my dog is cute"
+
 def run_tf(model_path: str):
 
     benchmark_fn = None
@@ -37,7 +39,7 @@ def run_tf(model_path: str):
         tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
         model = TFBertLMHeadModel.from_pretrained("bert-base-uncased")
 
-        inputs = tokenizer("Hello, my dog is cute", return_tensors="tf")
+        inputs = tokenizer(NLP_INPUT, return_tensors="tf")
         benchmark_fn = lambda: model(inputs)
 
     elif model_path.lower() == "gpt2":
@@ -46,7 +48,7 @@ def run_tf(model_path: str):
         tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
         model = TFGPT2LMHeadModel.from_pretrained("gpt2")
 
-        inputs = tokenizer("Hello, my dog is cute", return_tensors="tf")
+        inputs = tokenizer(NLP_INPUT, return_tensors="tf")
         benchmark_fn = lambda: model(inputs)
 
     else:
