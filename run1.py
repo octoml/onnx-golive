@@ -25,44 +25,47 @@ def run(
     # session_options.log_severity_level = 2
     # session_options.log_verbosity_level = 0
     # session_options.intra_op_num_threads = 8
+    session_inputs = {}
+    session_outputs = None
+
     session = ort.InferenceSession(onnx_model.SerializeToString(), session_options, providers=[ep])
     print(f"SELECTED EPs: {session.get_providers()}")
-
-    # Prepare inputs
-    inputs = session.get_inputs()
-    input_names, input_types, input_dims = zip(*[(i.name, ONNX_TO_NP_TYPE_MAP[i.type], i.shape) for i in inputs])
-    print(f"INPUT NAMES: {input_names}, TYPES: {input_types}, SHAPES: {input_dims}")
-
-    input_values = {}
 
     model_filename = os.path.basename(model_path).lower()
     if "bert" in model_filename:
         from transformers import BertTokenizer
 
         tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
-        inputs = tokenizer(NLP_INPUT)        
-        input_values[input_names[0]] = inputs
-
+        inputs = tokenizer(NLP_INPUT, return_tensors="np")        
+        session_inputs = dict(inputs)
     elif "gpt2" in model_filename:
         from transformers import GPT2Tokenizer
 
         tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-        inputs = tokenizer(NLP_INPUT)
-        input_values[input_names[0]] = np.array(inputs['input_ids'], dtype=input_types[0])
-
+        inputs = tokenizer(NLP_INPUT, return_tensors="np")
+        session_inputs = dict(inputs)
     else:
+        # Prepare inputs
+        inputs = session.get_inputs() 
+        input_names, input_types, input_dims = zip(*[(i.name, ONNX_TO_NP_TYPE_MAP[i.type], i.shape) for i in inputs])
+        print(f"INPUT NAMES: {input_names}, TYPES: {input_types}, SHAPES: {input_dims}")
+
         for i in range(0, len(inputs)):
             # regard unk__32 and None as 1
             shape = [1 if (x is None or (type(x) is str)) else x for x in input_dims[i]]
             vals = np.random.random_sample(shape).astype(input_types[i])
-            input_values[input_names[i]] = vals
+            session_inputs[input_names[i]] = vals
+
+    outputs = session.run(session_outputs, session_inputs)
+    for o in outputs:
+        print(o.shape, o.dtype)
 
     for _ in range(warmup_count):
-        session.run(None, input_values)
+        session.run(session_outputs, session_inputs)
 
     st = time.time()
     for _ in range(benchmark_count):
-        session.run(None, input_values)
+        session.run(session_outputs, session_inputs)
     return ((time.time() - st) / benchmark_count, benchmark_count)
 
 if __name__ == "__main__":

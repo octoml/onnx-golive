@@ -34,22 +34,28 @@ def run_tf(model_path: str):
     benchmark_fn = None
 
     if model_path.lower() == "bert":
-        from transformers import BertTokenizer, TFBertLMHeadModel
+        from transformers import BertTokenizer, TFBertModel
 
         tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
-        model = TFBertLMHeadModel.from_pretrained("bert-base-uncased")
+        model = TFBertModel.from_pretrained("bert-base-uncased")
 
         inputs = tokenizer(NLP_INPUT, return_tensors="tf")
-        benchmark_fn = lambda: model(inputs)
+        # print(inputs)
+        # outputs = model(input_ids=inputs['input_ids'], use_cache=False, output_attentions=False, output_hidden_states=False)
+        # print(outputs)
+        benchmark_fn = lambda: model(input_ids=inputs['input_ids'], use_cache=False, output_attentions=False, output_hidden_states=False)
 
     elif model_path.lower() == "gpt2":
-        from transformers import GPT2Tokenizer, TFGPT2LMHeadModel
+        from transformers import GPT2Tokenizer, TFGPT2Model
 
         tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-        model = TFGPT2LMHeadModel.from_pretrained("gpt2")
+        model = TFGPT2Model.from_pretrained("gpt2")
 
         inputs = tokenizer(NLP_INPUT, return_tensors="tf")
-        benchmark_fn = lambda: model(inputs)
+        # print(inputs)
+        # outputs = model(input_ids=inputs['input_ids'], use_cache=False, output_attentions=False, output_hidden_states=False)
+        # print(outputs)
+        benchmark_fn = lambda: model(input_ids=inputs['input_ids'], use_cache=False, output_attentions=False, output_hidden_states=False)
 
     else:
         tf_model = tf.saved_model.load(model_path)
@@ -101,7 +107,7 @@ def run_tf(model_path: str):
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python run1_tensorflow.py saved_model_path")
+        print("Usage: python run1.tensorflow.py saved_model_path")
         sys.exit(1)
 
     intra_threads, inter_threads =  tf.config.threading.get_intra_op_parallelism_threads(), tf.config.threading.get_inter_op_parallelism_threads(),

@@ -18,24 +18,28 @@ def run_torchscript(model_path: str, device):
     benchmark_fn = None
 
     if "bert" in model_path:
-        from transformers import BertTokenizer, BertLMHeadModel
+        from transformers import BertTokenizer, BertModel
 
         tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
         inputs = tokenizer(NLP_INPUT, return_tensors="pt")
 
-        model = BertLMHeadModel.from_pretrained("bert-base-uncased")
+        model = BertModel.from_pretrained("bert-base-uncased")
         model = model.to(device)
-        benchmark_fn = lambda: model(**inputs, labels=inputs["input_ids"])
+        model.eval()
+
+        benchmark_fn = lambda: model(input_ids=inputs['input_ids'], use_cache=False, output_attentions=False, output_hidden_states=False)
 
     elif "gpt2" in model_path:
-        from transformers import GPT2Tokenizer, GPT2LMHeadModel
+        from transformers import GPT2Tokenizer, GPT2Model
 
         tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
         inputs = tokenizer(NLP_INPUT, return_tensors="pt")
 
-        model = GPT2LMHeadModel.from_pretrained("gpt2")
+        model = GPT2Model.from_pretrained("gpt2")
         model = model.to(device)
-        benchmark_fn = lambda: model(**inputs, labels=inputs["input_ids"])
+        model.eval()
+
+        benchmark_fn = lambda: model(input_ids=inputs['input_ids'], use_cache=False, output_attentions=False, output_hidden_states=False)
 
     elif os.path.exists(model_path):
 
@@ -56,7 +60,7 @@ def run_torchscript(model_path: str, device):
         for iname, ishape in input_shapes.items():
             dtype = np.dtype(input_dtypes[iname])
             if np.issubdtype(dtype, np.integer):
-                d = np.zeros(shape, dtype=dtype)
+                d = np.zeros(ishape, dtype=dtype)
             else:
                 d = np.random.uniform(size=ishape).astype(dtype)
             input_data[iname] = d
@@ -76,7 +80,7 @@ def run_torchscript(model_path: str, device):
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python run1_tensorflow.py saved_model_path")
+        print("Usage: python run1.torch.py model_path")
         sys.exit(1)
 
     print(f"Torch {torch.__version__}")
