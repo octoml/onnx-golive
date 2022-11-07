@@ -1,14 +1,13 @@
+import argparse
 import sys
-import time
 
 import numpy as np
 import tensorflow as tf
 
 from olive.util import benchmark
 
-WARMUP_COUNT = 5
-BENCHMARK_COUNT = 50
-
+WARMUP_COUNT = 10
+BENCHMARK_COUNT = 100
 
 TENSORFLOW_DTYPE_TO_STRING = {
     tf.bfloat16: "bfloat16",
@@ -29,32 +28,28 @@ TENSORFLOW_DTYPE_TO_STRING = {
 
 NLP_INPUT = "Hello, my dog is cute"
 
-def run_tf(model_path: str):
+def run_tf(model_path: str, warmup_count: int, benchmark_count: int):
 
     benchmark_fn = None
 
     if model_path.lower() == "bert":
-        from transformers import BertTokenizer, TFBertModel
+        from transformers import BertTokenizer, TFBertForSequenceClassification
 
         tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
-        model = TFBertModel.from_pretrained("bert-base-uncased")
-
         inputs = tokenizer(NLP_INPUT, return_tensors="tf")
         # print(inputs)
-        # outputs = model(input_ids=inputs['input_ids'], use_cache=False, output_attentions=False, output_hidden_states=False)
-        # print(outputs)
-        benchmark_fn = lambda: model(input_ids=inputs['input_ids'], use_cache=False, output_attentions=False, output_hidden_states=False)
+
+        model = TFBertForSequenceClassification.from_pretrained("bert-base-uncased")
+        benchmark_fn = lambda: model(input_ids=inputs['input_ids'], output_attentions=False, output_hidden_states=False)
 
     elif model_path.lower() == "gpt2":
-        from transformers import GPT2Tokenizer, TFGPT2Model
+        from transformers import GPT2Tokenizer, TFGPT2ForSequenceClassification
 
         tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-        model = TFGPT2Model.from_pretrained("gpt2")
-
         inputs = tokenizer(NLP_INPUT, return_tensors="tf")
         # print(inputs)
-        # outputs = model(input_ids=inputs['input_ids'], use_cache=False, output_attentions=False, output_hidden_states=False)
-        # print(outputs)
+
+        model = TFGPT2ForSequenceClassification.from_pretrained("gpt2")
         benchmark_fn = lambda: model(input_ids=inputs['input_ids'], use_cache=False, output_attentions=False, output_hidden_states=False)
 
     else:
@@ -102,18 +97,20 @@ def run_tf(model_path: str):
 
         benchmark_fn = lambda: inference_fn(**inference_data)
 
-    return benchmark(benchmark_fn, WARMUP_COUNT, BENCHMARK_COUNT)
+    return benchmark(benchmark_fn, warmup_count, benchmark_count)
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python run1.tensorflow.py saved_model_path")
-        sys.exit(1)
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("model_path", help="model file path or (bert or gpt2)")
+    parser.add_argument("--once", action='store_true')
+    args = parser.parse_args()
 
     intra_threads, inter_threads =  tf.config.threading.get_intra_op_parallelism_threads(), tf.config.threading.get_inter_op_parallelism_threads(),
     print(f"TF: intra op threads: {intra_threads}, inter op threads: {inter_threads}")
     print(f"TF: devices: {tf.config.get_visible_devices()}")
 
-    model_path = sys.argv[1]
-    latency, runs = run_tf(model_path)
+    run_counts = [0, 1] if args.once else [WARMUP_COUNT, BENCHMARK_COUNT]
+    latency, runs = run_tf(args.model_path, *run_counts)
     print(f"Avg latency: {latency:0.2f} ms, {runs} runs")

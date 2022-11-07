@@ -1,41 +1,44 @@
+import argparse
 import os
-import sys
-import time
 
 import numpy as np
 import torch
 
 from olive.util import benchmark
 
-WARMUP_COUNT = 2
-BENCHMARK_COUNT = 10
+WARMUP_COUNT = 10
+BENCHMARK_COUNT = 100
 
 NLP_INPUT = "Hello, my dog is cute"
 
-def run_torchscript(model_path: str, device):
+def run_torchscript(model_path: str, device: str, warmup_count: int, benchmark_count: int):
 
     print(f"Device - {device}")
     benchmark_fn = None
 
     if "bert" in model_path:
-        from transformers import BertTokenizer, BertModel
+        from transformers import BertTokenizer, BertForSequenceClassification
 
         tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
         inputs = tokenizer(NLP_INPUT, return_tensors="pt")
+        inputs = inputs.to(device)
+        # print(inputs)
 
-        model = BertModel.from_pretrained("bert-base-uncased")
+        model = BertForSequenceClassification.from_pretrained("bert-base-uncased")
         model = model.to(device)
         model.eval()
 
-        benchmark_fn = lambda: model(input_ids=inputs['input_ids'], use_cache=False, output_attentions=False, output_hidden_states=False)
+        benchmark_fn = lambda: model(input_ids=inputs['input_ids'], output_attentions=False, output_hidden_states=False)
 
     elif "gpt2" in model_path:
-        from transformers import GPT2Tokenizer, GPT2Model
+        from transformers import GPT2Tokenizer, GPT2ForSequenceClassification
 
         tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
         inputs = tokenizer(NLP_INPUT, return_tensors="pt")
+        inputs = inputs.to(device)
+        # print(inputs)        
 
-        model = GPT2Model.from_pretrained("gpt2")
+        model = GPT2ForSequenceClassification.from_pretrained("gpt2")
         model = model.to(device)
         model.eval()
 
@@ -75,20 +78,23 @@ def run_torchscript(model_path: str, device):
 
         benchmark_fn = lambda: model(*inference_data)
 
-    return benchmark(benchmark_fn, WARMUP_COUNT, BENCHMARK_COUNT)
+    return benchmark(benchmark_fn, warmup_count, benchmark_count)
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python run1.torch.py model_path")
-        sys.exit(1)
+
+    default_device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("model_path", help="model file path or (bert or gpt2)")
+    parser.add_argument("--device", help=f"device - default {default_device}", default=default_device)
+    parser.add_argument("--once", action='store_true')
+    args = parser.parse_args()    
 
     print(f"Torch {torch.__version__}")
     intra_threads, inter_threads = torch.get_num_threads(), torch.get_num_interop_threads(),
     print(f"Torch: intra op threads: {intra_threads}, inter op threads: {inter_threads}")
 
-    model_path = sys.argv[1]
-    device = sys.argv[2] if len(sys.argv) > 3 else "cuda" if torch.cuda.is_available() else "cpu"
-
-    latency, runs = run_torchscript(model_path, device)
+    run_counts = [0, 1] if args.once else [WARMUP_COUNT, BENCHMARK_COUNT]
+    latency, runs = run_torchscript(args.model_path, args.device, *run_counts)
     print(f"Avg latency: {latency:0.2f} ms, {runs} runs")
