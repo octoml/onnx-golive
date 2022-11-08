@@ -8,15 +8,32 @@ from olive.util import benchmark
 
 WARMUP_COUNT = 10
 BENCHMARK_COUNT = 100
-
-NLP_INPUT = "Hello, my dog is cute"
+NLP_INPUT = "Lets benchmark an NLP model in all the frameworks"
 
 def run_torchscript(model_path: str, device: str, warmup_count: int, benchmark_count: int):
 
     print(f"Device - {device}")
     benchmark_fn = None
 
-    if "bert" in model_path:
+    if "distillbert" in model_path.lower():
+        from transformers import DistilBertTokenizer, DistilBertForSequenceClassification
+
+        tokenizer = DistilBertTokenizer.from_pretrained("distilbert-base-uncased")
+        inputs = tokenizer(NLP_INPUT, return_tensors="pt")
+        inputs = inputs.to(device)
+        # print(inputs)
+
+        model = DistilBertForSequenceClassification.from_pretrained("distilbert-base-uncased")
+        model = model.to(device)
+        model.eval()
+
+        def inference_fn():
+            with torch.no_grad():
+                model(**inputs)
+
+        benchmark_fn = inference_fn
+
+    elif "bert" in model_path.lower():
         from transformers import BertTokenizer, BertForSequenceClassification
 
         tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
@@ -28,9 +45,13 @@ def run_torchscript(model_path: str, device: str, warmup_count: int, benchmark_c
         model = model.to(device)
         model.eval()
 
-        benchmark_fn = lambda: model(input_ids=inputs['input_ids'], output_attentions=False, output_hidden_states=False)
+        def inference_fn():
+            with torch.no_grad():
+                model(input_ids=inputs['input_ids'], output_attentions=False, output_hidden_states=False)
 
-    elif "gpt2" in model_path:
+        benchmark_fn = inference_fn
+
+    elif "gpt2" in model_path.lower():
         from transformers import GPT2Tokenizer, GPT2ForSequenceClassification
 
         tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
@@ -42,7 +63,11 @@ def run_torchscript(model_path: str, device: str, warmup_count: int, benchmark_c
         model = model.to(device)
         model.eval()
 
-        benchmark_fn = lambda: model(input_ids=inputs['input_ids'], use_cache=False, output_attentions=False, output_hidden_states=False)
+        def inference_fn():
+            with torch.no_grad():
+                model(input_ids=inputs['input_ids'], use_cache=False, output_attentions=False, output_hidden_states=False)
+
+        benchmark_fn = inference_fn
 
     elif os.path.exists(model_path):
 
@@ -55,6 +80,9 @@ def run_torchscript(model_path: str, device: str, warmup_count: int, benchmark_c
         if "yolov5" in model_path.lower():
             input_dtypes = {"input": "float32" }
             input_shapes = {"input": [1, 3, 640, 640]}
+        elif "resnet" in model_path.lower():
+            input_dtypes = {"input": "float32"}
+            input_shapes = {"input": [1, 3, 224, 224]}
         else:
             assert not "Unknown model"
 

@@ -43,10 +43,11 @@ def benchmark(
     warmup_count: int,
     benchmark_count: int,
 ):
-
+    print(f"Warmup {warmup_count} run(s).")
     for _ in range(warmup_count):
         fn()
 
+    print(f"Benchmark {benchmark_count} run(s).")
     start_ns = perf_counter_ns()
     for _ in range(benchmark_count):
         fn()

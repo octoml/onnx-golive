@@ -26,13 +26,23 @@ TENSORFLOW_DTYPE_TO_STRING = {
     tf.string: "str",
 }
 
-NLP_INPUT = "Hello, my dog is cute"
+NLP_INPUT = "Lets benchmark an NLP model in all the frameworks"
 
 def run_tf(model_path: str, warmup_count: int, benchmark_count: int):
 
     benchmark_fn = None
 
-    if model_path.lower() == "bert":
+    if "distillbert" in model_path.lower():
+        from transformers import DistilBertTokenizer, TFDistilBertForSequenceClassification
+
+        tokenizer = DistilBertTokenizer.from_pretrained("distilbert-base-uncased")
+        inputs = tokenizer(NLP_INPUT, return_tensors="tf")
+        # print(inputs)
+
+        model = TFDistilBertForSequenceClassification.from_pretrained("distilbert-base-uncased")
+        benchmark_fn = lambda: model(**inputs)    
+
+    elif "bert" in model_path.lower():
         from transformers import BertTokenizer, TFBertForSequenceClassification
 
         tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
@@ -42,7 +52,7 @@ def run_tf(model_path: str, warmup_count: int, benchmark_count: int):
         model = TFBertForSequenceClassification.from_pretrained("bert-base-uncased")
         benchmark_fn = lambda: model(input_ids=inputs['input_ids'], output_attentions=False, output_hidden_states=False)
 
-    elif model_path.lower() == "gpt2":
+    elif "gpt2" in model_path.lower():
         from transformers import GPT2Tokenizer, TFGPT2ForSequenceClassification
 
         tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
@@ -56,17 +66,21 @@ def run_tf(model_path: str, warmup_count: int, benchmark_count: int):
         tf_model = tf.saved_model.load(model_path)
         inference_fn = tf_model.signatures["serving_default"]
 
+        input_shapes = {}
+        input_dtypes = {}        
+
         input_tensors = [
             tensor
             for tensor in inference_fn.inputs
             if tensor.dtype != tf.dtypes.resource
-        ]
-
-        input_shapes = {}
-        input_dtypes = {}
+        ]        
         for tensor in input_tensors:
             name = tensor.name
-            input_shapes.update({name: [dim or -1 for dim in tensor.shape]})
+            print(f"Serving Input Def: {name}, {tensor.shape}, {tensor.dtype}")
+            if "resnet" in model_path.lower():
+                input_shapes.update({name: [1, 224, 224, 3]})
+            else:
+                input_shapes.update({name: [dim or -1 for dim in tensor.shape]})
             input_dtypes.update(
                 {name: TENSORFLOW_DTYPE_TO_STRING[tensor.dtype]}
             )
