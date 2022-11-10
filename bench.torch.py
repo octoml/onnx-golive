@@ -80,7 +80,7 @@ def run_torchscript(model_path: str, device: str, warmup_count: int, benchmark_c
         if "yolov5" in model_path.lower():
             input_dtypes = {"input": "float32" }
             input_shapes = {"input": [1, 3, 640, 640]}
-        elif "resnet" in model_path.lower():
+        elif "resnet" in model_path.lower() or "mobilenet" in model_path.lower():
             input_dtypes = {"input": "float32"}
             input_shapes = {"input": [1, 3, 224, 224]}
         else:

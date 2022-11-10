@@ -77,7 +77,7 @@ def run_tf(model_path: str, warmup_count: int, benchmark_count: int):
         for tensor in input_tensors:
             name = tensor.name
             print(f"Serving Input Def: {name}, {tensor.shape}, {tensor.dtype}")
-            if "resnet" in model_path.lower():
+            if "resnet" in model_path.lower() or "mobilenet" in model_path.lower():
                 input_shapes.update({name: [1, 224, 224, 3]})
             else:
                 input_shapes.update({name: [dim or -1 for dim in tensor.shape]})
