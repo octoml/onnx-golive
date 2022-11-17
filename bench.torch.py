@@ -96,17 +96,56 @@ def run_torchscript(model_path: str, device: str, warmup_count: int, benchmark_c
                 d = np.random.uniform(size=ishape).astype(dtype)
             input_data[iname] = d
 
-        for key, value in input_data.items():
-            print(f"Input - Name: {key}, Shape: {value.shape}, DType: {value.dtype}")
-
         inference_data = []
-        for val in input_data.values():
+        for key, val in input_data.items():
             input_tensor = torch.from_numpy(val).to(device)
+            if "bf16" in model_path.lower():
+                input_tensor = input_tensor.bfloat16()
+            print(f"Input - Name: {key}, Shape: {input_tensor.shape}, DType: {input_tensor.dtype}")                
             inference_data.append(input_tensor)
+
+        def inference_fn():
+            with torch.no_grad():
+                model(*inference_data)            
 
         benchmark_fn = lambda: model(*inference_data)
 
     return benchmark(benchmark_fn, warmup_count, benchmark_count)
+
+
+# def export_bf16():
+#     import torchvision
+
+#     resnet = torchvision.models.resnet50(weights=torchvision.models.ResNet50_Weights.DEFAULT)
+#     resnet.eval()
+#     input_dtypes = {"input": "float32"}
+#     input_shapes = {"input": [1, 3, 224, 224]}    
+
+#     input_data = {}
+#     for iname, ishape in input_shapes.items():
+#         dtype = np.dtype(input_dtypes[iname])
+#         if np.issubdtype(dtype, np.integer):
+#             d = np.zeros(ishape, dtype=dtype)
+#         else:
+#             d = np.random.uniform(size=ishape).astype(dtype)
+#         input_data[iname] = d    
+
+#     input_tensors = [torch.from_numpy(val) for val in input_data.values()]
+#     output = resnet(input_tensors[0])
+#     print("Resnet50 FP32:", output.dtype, output.numel())
+
+#     traced_resnet = torch.jit.trace(resnet, input_tensors)
+#     print("Resnet50 traced")
+
+#     input_tensors_bf16 = input_tensors[0].bfloat16()
+#     resnet_bf16 = resnet.bfloat16()
+#     output = resnet_bf16(input_tensors_bf16)
+#     print("Resnet50 BF16:", output.dtype, output.numel())    
+
+#     traced_resnet_16 = torch.jit.trace(resnet_bf16, input_tensors_bf16)
+#     print("Resnet50 BF16 traced")
+#     torch.jit.save(traced_resnet_16, "resnet50.bf16.torchscript")
+#     torch.onnx.export(traced_resnet_16, input_tensors_bf16, "resnet.bf16.onnx", verbose=True)    
 
 
 if __name__ == "__main__":
@@ -126,3 +165,9 @@ if __name__ == "__main__":
     run_counts = [0, 1] if args.once else [WARMUP_COUNT, BENCHMARK_COUNT]
     latency, runs = run_torchscript(args.model_path, args.device, *run_counts)
     print(f"Avg latency: {latency:0.2f} ms, {runs} runs")
+
+
+
+
+
+    

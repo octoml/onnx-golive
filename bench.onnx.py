@@ -22,6 +22,7 @@ def run(
     onnx_model = onnx.load(model_path)
 
     session_options = ort.SessionOptions()
+    # session_options.enable_profiling = False
     # session_options.log_severity_level = 2
     # session_options.log_verbosity_level = 0
     # session_options.intra_op_num_threads = 8
