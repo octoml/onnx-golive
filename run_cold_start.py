@@ -5,6 +5,7 @@ import subprocess
 from typing import Dict
 import time
 
+import os
 import numpy as np
 import onnxruntime as ort
 import onnx
@@ -14,54 +15,43 @@ from onnxruntime.tools import onnx_model_utils
 def flush_cache():
     subprocess.check_call('sync; echo 3 > /proc/sys/vm/drop_caches', shell=True)
 
-
-def _run(onnx_model_file: str,
-         input_values: Dict[str, np.ndarray],
-         providers,
-         cache_flush_func,
-         iterations=250,
-         ) -> float:
-         
-    # Load model data into memory
+def run1(
+    onnx_model_file: str,
+    input_values: Dict[str, np.ndarray],
+    providers,
+):
+    st = time.time()
     session = ort.InferenceSession(
         onnx_model_file,
         providers=providers,
     )
 
     session.run(None, input_values)
+    return (time.time() - st)
 
-    st = time.time()
-    for k in range(iterations):
-        cache_flush_func()
-        session = ort.InferenceSession(
-            onnx_model_file,
-            providers=providers,
-        )
-        session.run(None, input_values)
-    return (time.time() - st) / iterations
+def run_warm(onnx_model_file: str,
+             input_values: Dict[str, np.ndarray],
+             providers,
+             ):
+    with open(onnx_model_file, 'rb') as fh:
+        b = fh.read()
+    return run1(onnx_model_file, input_values, providers)
 
-def run_warm(
-    onnx_model_file: str,
-    input_values: Dict[str, np.ndarray],
-    providers,
-    iterations=250,
-) -> float:
-    return _run(onnx_model_file, input_values, providers, lambda *args: None, iterations)
-
-def run_cold(
-    onnx_model_file: str,
-    input_values: Dict[str, np.ndarray],
-    providers,
-    iterations=250,
-):
-    return _run(onnx_model_file, input_values, providers, flush_cache, iterations)
+def run_cold(onnx_model_file: str,
+             input_values: Dict[str, np.ndarray],
+             providers,
+             ):
+    flush_cache()
+    return run1(onnx_model_file, input_values, providers)
 
 def run_hot(
     onnx_model_file: str,
     input_values: Dict[str, np.ndarray],
     providers,
-    iterations=250,
+    iterations=20,
 ):
+    print("Loading model data")
+
     # Load model data into memory
     session = ort.InferenceSession(
         onnx_model_file,
@@ -69,7 +59,9 @@ def run_hot(
     )
 
     session.run(None, input_values)
-    
+
+    print("Begin benchmark")
+
     st = time.time()
     for k in range(iterations):
         session.run(None, input_values)
@@ -151,21 +143,15 @@ if __name__ == "__main__":
     print(f"Benchmarking model {args.model} with inputs: {input_shapes}")
 
     if args.gpu:
-        providers = [('TensorrtExecutionProvider', {"CACHE": "1"})]
+        providers = [('TensorrtExecutionProvider', {"trt_engine_cache_enable": "True", "trt_engine_cache_path": os.getcwd(), "trt_fp16_enable": "True"})]
     else:
         providers = [("CPUExecutionProvider", {})]
 
     input_dict = get_input_dict(providers, args.model, input_shapes)
     print({key: val.shape for (key, val) in input_dict.items()})
 
-    latencies = []
+#    latencies = []
     run_func = RUN_FUNCS[args.cache]
-    for k in range(args.num_repeats):
-        lat = 1000 * run_func(args.model, input_dict, providers, args.num_iterations)
-        latencies.append(lat)
+    lat = 1000 * run_func(args.model, input_dict, providers)
 
-    mean = statistics.mean(latencies)
-    stdev = statistics.stdev(latencies)
-    cov = stdev / mean
-
-    print(mean, stdev, cov, min(latencies), max(latencies))
+    print(args.cache, lat)
