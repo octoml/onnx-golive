@@ -1,54 +1,68 @@
 
 import argparse
+import os
 import statistics
 import subprocess
-from typing import Dict
 import time
 
-import os
+from typing import Dict
+from multiprocessing import Pool
+
+import onnx
 import numpy as np
 import onnxruntime as ort
-import onnx
 from onnxruntime.tools import onnx_model_utils
-
 
 def flush_cache():
     subprocess.check_call('sync; echo 3 > /proc/sys/vm/drop_caches', shell=True)
 
-def run1(
+def run1(onnx_model_file: str,
+         input_values: Dict[str, np.ndarray],
+         providers,
+         ):
+    st = time.time()
+    session = ort.InferenceSession(
+        onnx_model_file,
+        providers=providers
+    )
+
+    session.run(None, input_values)
+    return time.time() - st
+
+def run_background(
     onnx_model_file: str,
     input_values: Dict[str, np.ndarray],
     providers,
 ):
-    st = time.time()
-    session = ort.InferenceSession(
-        onnx_model_file,
-        providers=providers,
-    )
-
-    session.run(None, input_values)
-    return (time.time() - st)
+    with Pool(processes=1) as pool:
+        return pool.apply(run1, args=[onnx_model_file, input_values, providers])
 
 def run_warm(onnx_model_file: str,
              input_values: Dict[str, np.ndarray],
              providers,
+             repeats
              ):
     with open(onnx_model_file, 'rb') as fh:
         b = fh.read()
-    return run1(onnx_model_file, input_values, providers)
+    latencies = [run_background(onnx_model_file, input_values, providers) for x in range(repeats)]
+    return statistics.mean(latencies)
 
 def run_cold(onnx_model_file: str,
              input_values: Dict[str, np.ndarray],
              providers,
+             repeats
              ):
-    flush_cache()
-    return run1(onnx_model_file, input_values, providers)
+    latencies = []
+    for k in range(repeats):
+        flush_cache()
+        latencies.append(run_background(onnx_model_file, input_values, providers) for x in range(repeats))
+    return statistics.mean(latencies)
 
 def run_hot(
     onnx_model_file: str,
     input_values: Dict[str, np.ndarray],
     providers,
-    iterations=20,
+    repeats=20,
 ):
     print("Loading model data")
 
@@ -63,9 +77,9 @@ def run_hot(
     print("Begin benchmark")
 
     st = time.time()
-    for k in range(iterations):
+    for k in range(repeats):
         session.run(None, input_values)
-    return (time.time() - st) / iterations
+    return (time.time() - st) / repeats
 
 RUN_FUNCS = {"hot": run_hot, "cold": run_cold, "warm": run_warm}
 
@@ -130,28 +144,30 @@ def get_input_dict(providers, model, shapes):
 
     return input_dict
 
+PROVIDERS = {
+    "cpu": [("CPUExecutionProvider", {})],
+    "trt": [('TensorrtExecutionProvider', {"trt_engine_cache_enable": "True", "trt_engine_cache_path": os.getcwd(), "trt_fp16_enable": "True"})],
+    "cuda": [("CUDAExecutionProvider", {})],
+}
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-i", "--num_iterations", help="Number of iterations per repeat", type=int, default=200)
-    parser.add_argument("-n", "--num_repeats", help="Number of repeats", type=int, default=10)
-    parser.add_argument("-g", '--gpu', help='Use GPU / TensorRT', action='store_true')
+    parser.add_argument("-n", "--num_repeats", help="Number of repeats", type=int, default=20)
+    parser.add_argument("-e", '--ep', help='ONNX execution provider', choices=['cpu', 'trt', 'cuda'], default='cpu')
     parser.add_argument("-c", '--cache', help='cache behavior', choices=['cold', 'warm', 'hot'], default='hot')
     parser.add_argument("model", help="The onnx model to benchmark")
     args = parser.parse_args()
    
     input_shapes = get_input_shapes(args.model)
-    print(f"Benchmarking model {args.model} with inputs: {input_shapes}")
+    print(f"Benchmarking model {args.model} on {args.ep} with inputs: {input_shapes}")
 
-    if args.gpu:
-        providers = [('TensorrtExecutionProvider', {"trt_engine_cache_enable": "True", "trt_engine_cache_path": os.getcwd(), "trt_fp16_enable": "True"})]
-    else:
-        providers = [("CPUExecutionProvider", {})]
+    providers = PROVIDERS[args.ep]
 
     input_dict = get_input_dict(providers, args.model, input_shapes)
     print({key: val.shape for (key, val) in input_dict.items()})
 
 #    latencies = []
     run_func = RUN_FUNCS[args.cache]
-    lat = 1000 * run_func(args.model, input_dict, providers)
+    lat = 1000 * run_func(args.model, input_dict, providers, args.num_repeats)
 
     print(args.cache, lat)
