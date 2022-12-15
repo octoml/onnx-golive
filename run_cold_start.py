@@ -6,7 +6,7 @@ import subprocess
 import time
 
 from typing import Dict
-from multiprocessing import Pool
+import multiprocessing
 
 import onnx
 import numpy as np
@@ -34,7 +34,8 @@ def run_background(
     input_values: Dict[str, np.ndarray],
     providers,
 ):
-    with Pool(processes=1) as pool:
+    ctx = multiprocessing.get_context("spawn")
+    with ctx.Pool(processes=1) as pool:
         return pool.apply(run1, args=[onnx_model_file, input_values, providers])
 
 def run_warm(onnx_model_file: str,
@@ -55,7 +56,7 @@ def run_cold(onnx_model_file: str,
     latencies = []
     for k in range(repeats):
         flush_cache()
-        latencies.append(run_background(onnx_model_file, input_values, providers) for x in range(repeats))
+        latencies.append(run_background(onnx_model_file, input_values, providers))
     return statistics.mean(latencies)
 
 def run_hot(
@@ -153,21 +154,37 @@ PROVIDERS = {
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-n", "--num_repeats", help="Number of repeats", type=int, default=20)
+    parser.add_argument("-a", '--all', help='Test every damn thing', action='store_true')
     parser.add_argument("-e", '--ep', help='ONNX execution provider', choices=['cpu', 'trt', 'cuda'], default='cpu')
     parser.add_argument("-c", '--cache', help='cache behavior', choices=['cold', 'warm', 'hot'], default='hot')
-    parser.add_argument("model", help="The onnx model to benchmark")
+    parser.add_argument("-o", '--outfile', help='output file', type=str, default='/dev/null')
+    parser.add_argument("model", help="The onnx model to benchmark", nargs='+')
     args = parser.parse_args()
-   
-    input_shapes = get_input_shapes(args.model)
-    print(f"Benchmarking model {args.model} on {args.ep} with inputs: {input_shapes}")
 
-    providers = PROVIDERS[args.ep]
+    
+    if args.all:
+        provider_list = list(PROVIDERS.items())
+        cache_list = ['hot', 'warm', 'cold']
+    else:
+        cache_list = [args.cache]
+        provider_list = [PROVIDERS[args.ep]]
 
-    input_dict = get_input_dict(providers, args.model, input_shapes)
-    print({key: val.shape for (key, val) in input_dict.items()})
+    for model in args.model:
+        input_shapes = get_input_shapes(model)
 
-#    latencies = []
-    run_func = RUN_FUNCS[args.cache]
-    lat = 1000 * run_func(args.model, input_dict, providers, args.num_repeats)
+        print(f"Benchmarking model {model} on {[k[0] for k in provider_list]} with inputs: {input_shapes}")
 
-    print(args.cache, lat)
+        for provider_name, providers in provider_list:
+            input_dict = get_input_dict(providers, model, input_shapes)
+            print({key: val.shape for (key, val) in input_dict.items()})
+
+            for cache in cache_list:
+                run_func = RUN_FUNCS[cache]
+                lat = 1000 * run_func(model, input_dict, providers, args.num_repeats)
+
+                out = ",".join([os.path.basename(model), provider_name, cache, str(lat)])
+                print(out)
+                with open(args.outfile, 'a') as fh:
+                    print(out, file=fh)
+    
+    
